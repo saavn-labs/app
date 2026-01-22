@@ -1,3 +1,5 @@
+import { getColors } from "react-native-image-colors";
+
 const DEFAULT_FALLBACK_COLOR = "#163f24";
 
 export const extractDominantColor = async (
@@ -6,7 +8,17 @@ export const extractDominantColor = async (
 ): Promise<{ color: string }> => {
   try {
     if (!imageUrl) return { color: fallbackColor };
-    return { color: fallbackColor };
+
+    const result = await getColors(imageUrl, {
+      fallback: fallbackColor,
+      quality: "low",
+      pixelSpacing: 5,
+    });
+
+    const color =
+      (result.platform === "android" && result.dominant) || fallbackColor;
+
+    return { color };
   } catch (error) {
     console.warn(`Color extraction error for ${imageUrl}:`, error);
     return { color: fallbackColor };
