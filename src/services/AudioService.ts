@@ -17,14 +17,10 @@ export class AudioService {
 
     try {
       await setAudioModeAsync({
-        // Keep playback alive while app is backgrounded/locked
         playsInSilentMode: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: false,
+        shouldPlayInBackground: true,
         shouldRouteThroughEarpiece: false,
-        playThroughEarpieceAndroid: false,
         interruptionModeAndroid: "doNotMix",
-        interruptionModeIOS: "doNotMix",
       });
       this.audioModeConfigured = true;
     } catch (error) {
@@ -36,14 +32,12 @@ export class AudioService {
     return this.player !== null && !this.isReleased;
   }
 
-  async loadAndPlayWithPreload(url: string, songId?: string): Promise<void> {
+  async loadAndPlayWithPreload(url: string): Promise<void> {
     const player = this.player;
     if (!player || this.isReleased) return;
 
     try {
       await this.configureAudioMode();
-
-      const id = songId || url.split("/").pop() || url;
 
       if (this.currentSource !== url) {
         await player.replace(url);
@@ -144,7 +138,6 @@ export class AudioService {
       }
       return this.player?.playing || false;
     } catch (error) {
-      // Mark player as released if we get an error accessing it
       this.isReleased = true;
       return false;
     }

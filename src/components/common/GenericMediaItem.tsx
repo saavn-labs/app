@@ -1,41 +1,54 @@
+/**
+ * Generic Media Item Component
+ * Unified component for albums, artists, playlists, collections
+ * Eliminates redundancy and improves maintainability
+ */
+
 import { Image } from "expo-image";
 import React, { memo } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 
-type MediaType = "album" | "artist" | "playlist" | "collection";
+export type MediaType = "album" | "artist" | "playlist" | "collection";
 
-interface BaseMediaData {
+export interface MediaData {
   id: string;
-  images?: Array<{ url: string; quality?: string }>;
   title?: string;
   name?: string;
   subtitle?: string;
+  images?: Array<{ url: string; quality?: string }>;
 }
 
-interface MediaItemProps {
-  data: BaseMediaData;
+interface GenericMediaItemProps {
+  data: MediaData;
   type: MediaType;
   onPress: () => void;
   horizontal?: boolean;
+  testID?: string;
 }
 
-const MediaItem: React.FC<MediaItemProps> = memo(
-  ({ data, type, onPress, horizontal = false }) => {
+const GenericMediaItem: React.FC<GenericMediaItemProps> = memo(
+  ({ data, type, onPress, horizontal = false, testID }) => {
     const theme = useTheme();
 
     const getImageUrl = (): string => {
       if (!data.images || data.images.length === 0) return "";
+      // Use medium quality (index 2) or fallback to first available
       return data.images[2]?.url || data.images[0]?.url || "";
     };
 
-    const getTitle = () => {
+    const getTitle = (): string => {
       return data.title || data.name || "Unknown";
     };
 
     const imageUrl = getImageUrl();
     const title = getTitle();
-    const isArtist = type === "artist";
+    const isCircular = type === "artist";
+
+    const imageStyle = [
+      horizontal ? styles.horizontalArtwork : styles.verticalArtwork,
+      isCircular && styles.circularImage,
+    ];
 
     if (horizontal) {
       return (
@@ -43,10 +56,11 @@ const MediaItem: React.FC<MediaItemProps> = memo(
           style={styles.horizontalContainer}
           onPress={onPress}
           activeOpacity={0.7}
+          testID={testID}
         >
           <Image
             source={{ uri: imageUrl }}
-            style={[styles.horizontalArtwork, isArtist && styles.circularImage]}
+            style={imageStyle}
             contentFit="cover"
             transition={200}
           />
@@ -78,10 +92,11 @@ const MediaItem: React.FC<MediaItemProps> = memo(
         style={styles.verticalContainer}
         onPress={onPress}
         activeOpacity={0.7}
+        testID={testID}
       >
         <Image
           source={{ uri: imageUrl }}
-          style={[styles.verticalArtwork, isArtist && styles.circularImage]}
+          style={imageStyle}
           contentFit="cover"
           transition={200}
         />
@@ -105,9 +120,17 @@ const MediaItem: React.FC<MediaItemProps> = memo(
       </TouchableOpacity>
     );
   },
+  (prevProps, nextProps) => {
+    // Custom comparison for better performance
+    return (
+      prevProps.data.id === nextProps.data.id &&
+      prevProps.type === nextProps.type &&
+      prevProps.horizontal === nextProps.horizontal
+    );
+  },
 );
 
-MediaItem.displayName = "MediaItem";
+GenericMediaItem.displayName = "GenericMediaItem";
 
 const styles = StyleSheet.create({
   horizontalContainer: {
@@ -156,4 +179,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default MediaItem;
+export default GenericMediaItem;

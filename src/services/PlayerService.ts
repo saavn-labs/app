@@ -1,5 +1,16 @@
+/**
+ *  Player Service
+ * - Performance improvements with throttling
+ * - Better error handling
+ * - Centralized constants
+ */
+
 import { PlayerStatus, RepeatMode } from "@/types";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Models, Song } from "@saavn-labs/sdk";
+import { AUDIO_QUALITY, PLAYER_CONFIG, STORAGE_KEYS } from "../constants";
+import { throttle } from "../utils/asyncHelpers";
+import { handleAsync, logError } from "../utils/errorHandler";
 import { audioService, AudioService } from "./AudioService";
 import { historyService } from "./HistoryService";
 import { mediaSessionService } from "./MediaSessionService";
@@ -25,6 +36,8 @@ export class PlayerService {
   private queueService: QueueService;
   private listeners: Set<PlayerListener> = new Set();
   private progressInterval: ReturnType<typeof setInterval> | null = null;
+  private lastPlayNextTime: number = 0;
+
   private state: PlayerState = {
     status: "idle",
     currentSong: null,
@@ -33,21 +46,50 @@ export class PlayerService {
     progress: 0,
     duration: 0,
     isShuffled: false,
-    repeatMode: "off",
+    repeatMode: false,
     error: null,
   };
+
+  private throttledMetadataUpdate = throttle(
+    (
+      song: Models.Song,
+      url: string,
+      isPlaying: boolean,
+      progress: number,
+      duration: number,
+    ) => {
+      mediaSessionService.updateNowPlaying(
+        song,
+        url,
+        isPlaying,
+        progress,
+        duration,
+      );
+    },
+    PLAYER_CONFIG.METADATA_UPDATE_THROTTLE,
+  );
+
+  private throttledStateUpdate = throttle(
+    (isPlaying: boolean, progress: number) => {
+      mediaSessionService.updatePlaybackState(isPlaying, progress);
+    },
+    500,
+  );
 
   constructor(audioService: AudioService, queueService: QueueService) {
     this.audioService = audioService;
     this.queueService = queueService;
+    this.setupMediaSession();
+  }
 
+  private setupMediaSession() {
     mediaSessionService.initialize({
-      onPlay: () => this.play(),
-      onPause: () => this.pause(),
-      onPlayPause: () => this.togglePlayPause(),
-      onNext: () => this.playNext(),
-      onPrevious: () => this.playPrevious(),
-      onSeek: (position) => this.seekTo(position),
+      onPlay: async () => await this.play(),
+      onPause: async () => await this.pause(),
+      onPlayPause: async () => await this.togglePlayPause(),
+      onNext: async () => await this.playNext(),
+      onPrevious: async () => await this.playPrevious(),
+      onSeek: async (position) => await this.seekTo(position),
     });
   }
 
@@ -88,18 +130,18 @@ export class PlayerService {
           if (progressChanged || durationChanged) {
             this.updateState({ progress, duration });
 
-            // Update media session only when duration changes or periodically
-            if (this.state.currentSong && durationChanged) {
-              mediaSessionService.updateNowPlaying(
-                this.state.currentSong,
-                "",
-                true,
-                progress,
-                duration,
-              );
-            } else if (this.state.currentSong) {
-              // Only update playback state (position) without full metadata
-              mediaSessionService.updatePlaybackState(true, progress);
+            if (this.state.currentSong) {
+              if (durationChanged) {
+                this.throttledMetadataUpdate(
+                  this.state.currentSong,
+                  "",
+                  true,
+                  progress,
+                  duration,
+                );
+              } else {
+                this.throttledStateUpdate(true, progress);
+              }
             }
           }
 
@@ -110,15 +152,25 @@ export class PlayerService {
             );
           }
 
-          if (duration > 0 && progress >= duration - 0.3) {
-            this.playNext();
+          if (
+            duration > 0 &&
+            progress >= duration - PLAYER_CONFIG.TRACK_END_THRESHOLD
+          ) {
+            const now = Date.now();
+            if (
+              now - this.lastPlayNextTime >
+              PLAYER_CONFIG.PLAY_NEXT_DEBOUNCE
+            ) {
+              this.lastPlayNextTime = now;
+              this.playNext();
+            }
           }
         }
       } catch (error) {
-        console.error("Error in progress tracking:", error);
+        logError("Progress tracking", error);
         this.stopProgressTracking();
       }
-    }, 250) as number;
+    }, PLAYER_CONFIG.PROGRESS_UPDATE_INTERVAL) as unknown as number;
   }
 
   private stopProgressTracking() {
@@ -172,13 +224,19 @@ export class PlayerService {
       "edge",
       true,
     );
-    const streamUrl = urls[2]?.url || urls[1]?.url || urls[0]?.url;
+
+    const quality =
+      (await AsyncStorage.getItem(STORAGE_KEYS.CONTENT_QUALITY)) || "medium";
+    const streamIndex =
+      AUDIO_QUALITY[quality.toUpperCase() as keyof typeof AUDIO_QUALITY] ||
+      AUDIO_QUALITY.MEDIUM;
+    const streamUrl = urls[streamIndex].url;
 
     if (!streamUrl) {
       throw new Error("No streaming URL available");
     }
 
-    await this.audioService.loadAndPlayWithPreload(streamUrl, song.id);
+    await this.audioService.loadAndPlayWithPreload(streamUrl);
     const duration = this.audioService.getDuration();
 
     await mediaSessionService.updateNowPlaying(
@@ -205,7 +263,7 @@ export class PlayerService {
   private handlePlayError(error: unknown) {
     const message =
       error instanceof Error ? error.message : "Failed to play song";
-    console.error("Error playing song:", error);
+    logError("Play song", error);
     this.updateState({
       status: "error",
       error: message,
@@ -266,12 +324,9 @@ export class PlayerService {
   }
 
   async playNext() {
-    // If looping current song, just restart it instead of advancing
-    if (this.state.repeatMode === "one") {
+    if (this.state.repeatMode) {
       await this.seekTo(0);
-      if (!this.audioService.isPlaying()) {
-        await this.audioService.play();
-      }
+      await this.audioService.play();
       await mediaSessionService.updatePlaybackState(true, 0);
       return;
     }
@@ -281,20 +336,20 @@ export class PlayerService {
       this.queueService.getQueue().length - 1;
 
     if (isLastOrOnlySong && this.state.currentSong) {
-      try {
-        const recommendations = await this.queueService.fetchRecommendations(
-          this.state.currentSong.id,
-          true,
-        );
+      const result = await handleAsync(
+        () =>
+          this.queueService.fetchRecommendations(
+            this.state.currentSong!.id,
+            true,
+          ),
+        "Failed to fetch recommendations",
+      );
 
-        if (recommendations.length > 0) {
-          this.queueService.appendQueue(recommendations);
-          this.updateState({
-            ...this.getWindowedQueueState(),
-          });
-        }
-      } catch (error) {
-        console.error("Failed to fetch more recommendations:", error);
+      if (result.success && result.data && result.data.length > 0) {
+        this.queueService.appendQueue(result.data);
+        this.updateState({
+          ...this.getWindowedQueueState(),
+        });
       }
     }
 
@@ -336,7 +391,7 @@ export class PlayerService {
       );
       this.updateState({ progress: position });
     } catch (error) {
-      console.error("Error seeking:", error);
+      logError("Seek", error);
     }
   }
 
@@ -352,7 +407,6 @@ export class PlayerService {
     try {
       if (this.state.status !== "playing") return;
 
-      // If OS paused us while backgrounded, resume politely
       if (!this.audioService.isPlaying()) {
         await this.audioService.play();
         await mediaSessionService.updatePlaybackState(
@@ -361,12 +415,12 @@ export class PlayerService {
         );
       }
     } catch (error) {
-      console.error("Error ensuring background playback:", error);
+      logError("Background playback", error);
     }
   }
 
-  cycleRepeatMode() {
-    const newMode = this.queueService.cycleRepeatMode();
+  toggleRepeatMode() {
+    const newMode = this.queueService.toggleRepeatMode();
     this.updateState({ repeatMode: newMode });
   }
 

@@ -22,6 +22,7 @@ import {
   Text,
   useTheme,
 } from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface TrackContextMenuProps {
   visible: boolean;
@@ -39,6 +40,7 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
   const theme = useTheme();
   const router = useRouter();
   const { addToQueue, addNextInQueue } = usePlayer();
+  const insets = useSafeAreaInsets();
   const [showCollections, setShowCollections] = useState(false);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -151,7 +153,6 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
     }
   }, [track, router, onDismiss]);
 
-  // Get display text for subtitle
   const getSubtitle = useCallback(() => {
     if (track.subtitle) return track.subtitle;
 
@@ -315,7 +316,10 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
               <Surface
                 style={[
                   styles.menu,
-                  { backgroundColor: theme.colors.elevation.level2 },
+                  {
+                    backgroundColor: theme.colors.elevation.level2,
+                    paddingBottom: insets.bottom,
+                  },
                 ]}
                 elevation={5}
               >

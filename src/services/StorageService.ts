@@ -1,21 +1,26 @@
+import { AUDIO_QUALITY, STORAGE_KEYS, UI_CONFIG } from "@/constants";
+import { storageCache } from "@/utils/cache";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Models } from "@saavn-labs/sdk";
 
-const KEYS = {
-  FAVORITES: "@favorites",
-  RECENT_SEARCHES: "@recent_searches",
-};
-
 /**
- * StorageService - Manages favorites and recent searches
+ * StorageService - Manages favorites, recent searches, and user preferences
  * For collections/playlists, use CollectionService
  */
 export class StorageService {
-  // Favorites
   async getFavorites(): Promise<Models.Song[]> {
     try {
-      const data = await AsyncStorage.getItem(KEYS.FAVORITES);
-      return data ? JSON.parse(data) : [];
+      // Check cache first
+      const cached = storageCache.get(STORAGE_KEYS.FAVORITES);
+      if (cached) return cached;
+
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.FAVORITES);
+      const favorites = data ? JSON.parse(data) : [];
+
+      // Update cache
+      storageCache.set(STORAGE_KEYS.FAVORITES, favorites);
+
+      return favorites;
     } catch (error) {
       console.error("Error getting favorites:", error);
       return [];
@@ -28,7 +33,12 @@ export class StorageService {
       const exists = favorites.some((s) => s.id === song.id);
       if (!exists) {
         favorites.unshift(song);
-        await AsyncStorage.setItem(KEYS.FAVORITES, JSON.stringify(favorites));
+        await AsyncStorage.setItem(
+          STORAGE_KEYS.FAVORITES,
+          JSON.stringify(favorites),
+        );
+        // Update cache
+        storageCache.set(STORAGE_KEYS.FAVORITES, favorites);
       }
     } catch (error) {
       console.error("Error adding favorite:", error);
@@ -39,7 +49,12 @@ export class StorageService {
     try {
       const favorites = await this.getFavorites();
       const filtered = favorites.filter((s) => s.id !== songId);
-      await AsyncStorage.setItem(KEYS.FAVORITES, JSON.stringify(filtered));
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.FAVORITES,
+        JSON.stringify(filtered),
+      );
+      // Update cache
+      storageCache.set(STORAGE_KEYS.FAVORITES, filtered);
     } catch (error) {
       console.error("Error removing favorite:", error);
     }
@@ -55,11 +70,19 @@ export class StorageService {
     }
   }
 
-  // Recent Searches
   async getRecentSearches(): Promise<string[]> {
     try {
-      const data = await AsyncStorage.getItem(KEYS.RECENT_SEARCHES);
-      return data ? JSON.parse(data) : [];
+      // Check cache first
+      const cached = storageCache.get(STORAGE_KEYS.RECENT_SEARCHES);
+      if (cached) return cached;
+
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.RECENT_SEARCHES);
+      const searches = data ? JSON.parse(data) : [];
+
+      // Update cache
+      storageCache.set(STORAGE_KEYS.RECENT_SEARCHES, searches);
+
+      return searches;
     } catch (error) {
       console.error("Error getting recent searches:", error);
       return [];
@@ -71,8 +94,13 @@ export class StorageService {
       const searches = await this.getRecentSearches();
       const filtered = searches.filter((s) => s !== query);
       filtered.unshift(query);
-      const limited = filtered.slice(0, 10); // Keep only 10 recent searches
-      await AsyncStorage.setItem(KEYS.RECENT_SEARCHES, JSON.stringify(limited));
+      const limited = filtered.slice(0, UI_CONFIG.MAX_RECENT_SEARCHES);
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.RECENT_SEARCHES,
+        JSON.stringify(limited),
+      );
+      // Update cache
+      storageCache.set(STORAGE_KEYS.RECENT_SEARCHES, limited);
     } catch (error) {
       console.error("Error adding recent search:", error);
     }
@@ -80,9 +108,30 @@ export class StorageService {
 
   async clearRecentSearches(): Promise<void> {
     try {
-      await AsyncStorage.removeItem(KEYS.RECENT_SEARCHES);
+      await AsyncStorage.removeItem(STORAGE_KEYS.RECENT_SEARCHES);
+      // Clear cache
+      storageCache.delete(STORAGE_KEYS.RECENT_SEARCHES);
     } catch (error) {
       console.error("Error clearing recent searches:", error);
+    }
+  }
+
+  async getContentQuality(): Promise<keyof typeof AUDIO_QUALITY> {
+    try {
+      const quality = await AsyncStorage.getItem(STORAGE_KEYS.CONTENT_QUALITY);
+      return (quality as keyof typeof AUDIO_QUALITY) || "MEDIUM";
+    } catch (error) {
+      console.error("Error getting content quality:", error);
+      return "MEDIUM";
+    }
+  }
+
+  async saveContentQuality(quality: keyof typeof AUDIO_QUALITY): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.CONTENT_QUALITY, quality);
+    } catch (error) {
+      console.error("Error saving content quality:", error);
+      throw error;
     }
   }
 }

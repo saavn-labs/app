@@ -1,4 +1,5 @@
 import { getColors } from "react-native-image-colors";
+import { imageColorCache } from "./cache";
 
 const DEFAULT_FALLBACK_COLOR = "#163f24";
 
@@ -9,6 +10,12 @@ export const extractDominantColor = async (
   try {
     if (!imageUrl) return { color: fallbackColor };
 
+    // Check cache first for performance
+    const cached = imageColorCache.get(imageUrl);
+    if (cached) {
+      return { color: cached };
+    }
+
     const result = await getColors(imageUrl, {
       fallback: fallbackColor,
       quality: "low",
@@ -17,6 +24,9 @@ export const extractDominantColor = async (
 
     const color =
       (result.platform === "android" && result.darkVibrant) || fallbackColor;
+
+    // Cache the result
+    imageColorCache.set(imageUrl, color);
 
     return { color };
   } catch (error) {

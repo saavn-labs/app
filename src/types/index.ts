@@ -5,7 +5,7 @@ export type MediaType = "song" | "album" | "artist" | "playlist" | "collection";
 
 // Player types
 export type PlayerStatus = "idle" | "loading" | "playing" | "paused" | "error";
-export type RepeatMode = "off" | "all" | "one";
+export type RepeatMode = boolean; // true = repeat on, false = repeat off
 
 // Navigation types
 export interface NavigationProps {

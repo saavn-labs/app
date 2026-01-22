@@ -1,10 +1,12 @@
-import { CompactPlayer, FullPlayer } from "@/components";
+import { CompactPlayer, FullPlayer, GenericMediaItem } from "@/components";
 import EmptyState from "@/components/common/EmptyState";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
-import AlbumItem from "@/components/items/AlbumItem";
 import TrackItem from "@/components/items/TrackItem";
+import { COLORS } from "@/constants";
 import { usePlayer } from "@/contexts/PlayerContext";
+import { imageColorCache } from "@/utils/cache";
 import { getScreenPaddingBottom } from "@/utils/designSystem";
+import { handleAsync, logError } from "@/utils/errorHandler";
 import { Album, Artist, Models, Playlist } from "@saavn-labs/sdk";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -77,11 +79,11 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
 
   const loadData = useCallback(
     async (isRefreshing = false) => {
-      try {
-        if (!isRefreshing) setLoading(true);
-        setError(null);
+      if (!isRefreshing) setLoading(true);
+      setError(null);
 
-        let result: DetailData;
+      const result = await handleAsync(async () => {
+        let result: any;
         switch (type) {
           case "album":
             result = await Album.getById({ albumId: id });
@@ -93,20 +95,34 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
             result = await Artist.getById({ artistId: id });
             break;
         }
+        return result;
+      }, `Failed to load ${type}`);
 
-        setData(result);
+      if (result.success && result.data) {
+        setData(result.data);
 
-        const imageUrl = result.images?.[2]?.url || result.images?.[0]?.url;
+        // Handle dominant color with caching
+        const imageUrl =
+          result.data.images?.[2]?.url || result.data.images?.[0]?.url;
         if (imageUrl) {
-          setDominantColor(type === "artist" ? "#6366f1" : "#1db954");
+          // Check cache first
+          const cachedColor = imageColorCache.get(imageUrl);
+          if (cachedColor) {
+            setDominantColor(cachedColor);
+          } else {
+            // Use default colors and cache them
+            const defaultColor = type === "artist" ? "#6366f1" : COLORS.PRIMARY;
+            setDominantColor(defaultColor);
+            imageColorCache.set(imageUrl, defaultColor);
+          }
         }
-      } catch (error) {
-        console.error(`Error loading ${type}:`, error);
-        setError(`Failed to load ${type}`);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
+      } else {
+        setError(result.error || `Failed to load ${type}`);
+        logError(`DetailScreen.loadData.${type}`, result.error);
       }
+
+      setLoading(false);
+      setRefreshing(false);
     },
     [id, type],
   );
@@ -149,7 +165,8 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
 
   const handleShare = useCallback(async () => {
     if (!data) return;
-    try {
+
+    const result = await handleAsync(async () => {
       const displayName = data.title || data.name || "Unknown";
       const shareUrl =
         data.url || `https://www.jiosaavn.com/${type}/${data.id}`;
@@ -163,8 +180,10 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
         url: shareUrl,
         title: displayName,
       });
-    } catch (error) {
-      console.error("Error sharing:", error);
+    }, "Failed to share");
+
+    if (!result.success) {
+      logError("DetailScreen.handleShare", result.error);
     }
   }, [data, type]);
 
@@ -184,7 +203,11 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
 
   const renderAlbumItem = useCallback(
     ({ item }: { item: Models.Album }) => (
-      <AlbumItem album={item} onPress={() => onAlbumPress?.(item.id)} />
+      <GenericMediaItem
+        data={item}
+        type="album"
+        onPress={() => onAlbumPress?.(item.id)}
+      />
     ),
     [onAlbumPress],
   );

@@ -1,8 +1,10 @@
 import TrackItem from "@/components/items/TrackItem";
+import { COLORS } from "@/constants";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Collection, collectionService } from "@/services/CollectionService";
 import { storageService } from "@/services/StorageService";
 import { getScreenPaddingBottom } from "@/utils/designSystem";
+import { handleAsync, logError } from "@/utils/errorHandler";
 
 import { MaterialIcons } from "@expo/vector-icons";
 import { Models } from "@saavn-labs/sdk";
@@ -54,26 +56,25 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
   const [newCollectionName, setNewCollectionName] = useState("");
 
   const scrollY = useRef(new Animated.Value(0)).current;
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [0, 1],
-    extrapolate: "clamp",
-  });
 
   useEffect(() => {
     loadLibraryData();
   }, []);
 
   const loadLibraryData = async () => {
-    try {
+    const result = await handleAsync(async () => {
       const [favs, colls] = await Promise.all([
         storageService.getFavorites(),
         collectionService.getCollections(),
       ]);
-      setFavorites(favs);
-      setCollections(colls);
-    } catch (error) {
-      console.error("Error loading library:", error);
+      return { favs, colls };
+    }, "Failed to load library data");
+
+    if (result.success && result.data) {
+      setFavorites(result.data.favs);
+      setCollections(result.data.colls);
+    } else {
+      logError("LibraryScreen.loadLibraryData", result.error);
     }
   };
 
@@ -115,14 +116,16 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
       return;
     }
 
-    try {
+    const result = await handleAsync(async () => {
       await collectionService.createCollection(newCollectionName.trim());
       setNewCollectionName("");
       setShowCreateModal(false);
       await loadLibraryData();
-    } catch (error) {
-      console.error("Error creating collection:", error);
-      Alert.alert("Error", "Failed to create collection");
+    }, "Failed to create collection");
+
+    if (!result.success) {
+      Alert.alert("Error", result.error || "Failed to create collection");
+      logError("LibraryScreen.handleCreateCollection", result.error);
     }
   };
 
@@ -136,11 +139,17 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
-            try {
+            const result = await handleAsync(async () => {
               await collectionService.deleteCollection(collectionId);
               await loadLibraryData();
-            } catch (error) {
-              console.error("Error deleting collection:", error);
+            }, "Failed to delete collection");
+
+            if (!result.success) {
+              Alert.alert(
+                "Error",
+                result.error || "Failed to delete collection",
+              );
+              logError("LibraryScreen.handleDeleteCollection", result.error);
             }
           },
         },
@@ -207,7 +216,7 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
       <View style={styles.contentContainer}>
         {/* Hero Header */}
         <LinearGradient
-          colors={["#1db954", "#1aa34a", theme.colors.background]}
+          colors={[COLORS.PRIMARY, "#1aa34a", theme.colors.background]}
           style={styles.favoritesHeader}
         >
           <View style={styles.favoritesHeroContent}>

@@ -6,7 +6,7 @@ export class QueueService {
   private currentIndex: number = -1;
   private originalQueue: Models.Song[] = [];
   private shuffled: boolean = false;
-  private repeatMode: RepeatMode = "off";
+  private repeatMode: RepeatMode = false;
   private playedIndices: Set<number> = new Set();
   private readonly maxPrevious: number = 10;
   private readonly minAfter: number = 1;
@@ -45,7 +45,6 @@ export class QueueService {
   }
 
   appendQueue(songs: Models.Song[]) {
-    // Only cleanup if we have skipped songs to reclaim memory
     if (this.playedIndices.size < this.currentIndex) {
       this.cleanupSkippedSongs();
     }
@@ -57,22 +56,18 @@ export class QueueService {
   }
 
   private cleanupSkippedSongs() {
-    // Collect only played songs
     const playedSongs = this.queue
       .slice(0, this.currentIndex + 1)
       .filter((_, i) => this.playedIndices.has(i));
 
-    // Combine with remaining songs after current
     this.queue = [...playedSongs, ...this.queue.slice(this.currentIndex + 1)];
     this.currentIndex = playedSongs.length - 1;
 
-    // Reset played indices (all songs up to current are now "played")
     this.playedIndices.clear();
     for (let i = 0; i <= this.currentIndex; i++) {
       this.playedIndices.add(i);
     }
 
-    // Sync original queue if not shuffled
     if (!this.shuffled) {
       this.originalQueue = this.queue;
     }
@@ -163,7 +158,7 @@ export class QueueService {
   }
 
   next(): Models.Song | null {
-    if (this.repeatMode === "one") {
+    if (this.repeatMode && this.currentIndex < this.queue.length) {
       return this.getCurrentSong();
     }
 
@@ -171,9 +166,6 @@ export class QueueService {
       this.currentIndex++;
       this.playedIndices.add(this.currentIndex);
       this.truncateQueue();
-    } else if (this.repeatMode === "all" && this.queue.length > 0) {
-      this.currentIndex = 0;
-      this.playedIndices.add(this.currentIndex);
     } else {
       return null;
     }
@@ -182,7 +174,7 @@ export class QueueService {
   }
 
   previous(): Models.Song | null {
-    if (this.repeatMode === "one") {
+    if (this.repeatMode && this.currentIndex < this.queue.length) {
       return this.getCurrentSong();
     }
 
@@ -190,9 +182,6 @@ export class QueueService {
       this.currentIndex--;
       this.playedIndices.add(this.currentIndex);
       this.truncateQueue();
-    } else if (this.repeatMode === "all" && this.queue.length > 0) {
-      this.currentIndex = this.queue.length - 1;
-      this.playedIndices.add(this.currentIndex);
     } else {
       return null;
     }
@@ -221,10 +210,9 @@ export class QueueService {
     } else {
       const currentSong = this.getCurrentSong();
       if (currentSong) {
-        // Move current song to front
         const currentQueue = this.queue.slice();
         currentQueue.splice(this.currentIndex, 1);
-        // Fisher-Yates shuffle for remaining songs
+
         for (let i = currentQueue.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [currentQueue[i], currentQueue[j]] = [
@@ -243,10 +231,8 @@ export class QueueService {
     return this.shuffled;
   }
 
-  cycleRepeatMode(): RepeatMode {
-    const modes: RepeatMode[] = ["off", "all", "one"];
-    const currentIndex = modes.indexOf(this.repeatMode);
-    this.repeatMode = modes[(currentIndex + 1) % modes.length];
+  toggleRepeatMode(): RepeatMode {
+    this.repeatMode = !this.repeatMode;
     return this.repeatMode;
   }
 

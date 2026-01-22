@@ -1,15 +1,13 @@
-import AlbumItem from "@/components/items/AlbumItem";
-import ArtistItem from "@/components/items/ArtistItem";
-import PlaylistItem from "@/components/items/PlaylistItem";
-import TrackItem from "@/components/items/TrackItem";
+import { GenericMediaItem, TrackItem } from "@/components";
+import { UI_CONFIG } from "@/constants";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { storageService } from "@/services/StorageService";
 import { getScreenPaddingBottom } from "@/utils/designSystem";
+import { handleAsync, logError } from "@/utils/errorHandler";
 import { Album, Artist, Extras, Models, Playlist, Song } from "@saavn-labs/sdk";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
-  Dimensions,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -17,8 +15,6 @@ import {
 } from "react-native";
 import { IconButton, Searchbar, Text, useTheme } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-const { width } = Dimensions.get("window");
 
 type SearchTab = "all" | "songs" | "albums" | "artists" | "playlists";
 
@@ -43,7 +39,6 @@ interface LoadingStates {
   playlists: boolean;
 }
 
-// Enhanced Skeleton Loader Component
 const SkeletonItem: React.FC = () => {
   const fadeAnim = useRef(new Animated.Value(0.3)).current;
 
@@ -87,7 +82,6 @@ const SkeletonList: React.FC<{ count?: number }> = ({ count = 5 }) => (
   </View>
 );
 
-// Enhanced Recent Searches Component
 const RecentSearches: React.FC<{
   searches: string[];
   onSelect: (search: string) => void;
@@ -146,7 +140,6 @@ const RecentSearches: React.FC<{
   );
 };
 
-// Empty State Component
 const EmptySearchState: React.FC<{ query: string }> = ({ query }) => {
   const theme = useTheme();
 
@@ -254,11 +247,21 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
   };
 
   const performSearch = useCallback(async (query: string, tab: SearchTab) => {
-    if (query.trim()) {
-      await storageService.addRecentSearch(query.trim());
-      await loadRecentSearches();
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) return;
+
+    // Save to recent searches
+    if (trimmedQuery) {
+      const result = await handleAsync(
+        async () => await storageService.addRecentSearch(trimmedQuery),
+        "Failed to save recent search",
+      );
+      if (result.success) {
+        await loadRecentSearches();
+      }
     }
 
+    // Cancel previous search
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -277,8 +280,14 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
           artists: true,
           playlists: true,
         });
-        try {
-          const result = await Extras.searchAll({ query });
+
+        const searchResult = await handleAsync(
+          async () => await Extras.searchAll({ query: trimmedQuery }),
+          "Search failed",
+        );
+
+        if (searchResult.success && searchResult.data) {
+          const result = searchResult.data;
           if (!abortController.signal.aborted) {
             setResults({
               songs: (result.songs?.data as Models.Song[]) || [],
@@ -287,30 +296,29 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
               playlists: (result.playlists?.data as Models.Playlist[]) || [],
             });
           }
-        } catch (err) {
-          if (!abortController.signal.aborted) {
-            console.error("Search all error:", err);
-          }
-        } finally {
-          if (!abortController.signal.aborted) {
-            setLoadingStates({
-              songs: false,
-              albums: false,
-              artists: false,
-              playlists: false,
-            });
-          }
+        } else if (!abortController.signal.aborted) {
+          setError(searchResult.error || "Search failed");
+          logError("SearchScreen.performSearch", searchResult.error);
+        }
+
+        if (!abortController.signal.aborted) {
+          setLoadingStates({
+            songs: false,
+            albums: false,
+            artists: false,
+            playlists: false,
+          });
         }
       } else {
         await searchCategory(
-          query,
+          trimmedQuery,
           tab as keyof SearchResults,
           abortController.signal,
         );
       }
     } catch (err) {
       if (!abortController.signal.aborted) {
-        console.error("Search error:", err);
+        logError("SearchScreen.performSearch", err);
         setError("Failed to perform search. Please try again.");
       }
     }
@@ -326,7 +334,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
     if (trimmedQuery.length >= 2) {
       debounceTimerRef.current = setTimeout(() => {
         performSearch(trimmedQuery, activeTab);
-      }, 300);
+      }, UI_CONFIG.SEARCH_DEBOUNCE);
     } else {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -364,7 +372,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
 
   const handleRemoveRecentSearch = useCallback(async (search: string) => {
     setRecentSearches((prev) => prev.filter((s) => s !== search));
-    // You may want to add storageService.removeRecentSearch(search) here
   }, []);
 
   const handleClearRecentSearches = useCallback(async () => {
@@ -427,9 +434,10 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
         {albums
           .slice(0, activeTab === "albums" ? albums.length : 5)
           .map((album) => (
-            <AlbumItem
+            <GenericMediaItem
               key={album.id}
-              album={album}
+              data={album}
+              type="album"
               onPress={() => onAlbumPress(album.id)}
             />
           ))}
@@ -447,9 +455,10 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
         {artists
           .slice(0, activeTab === "artists" ? artists.length : 5)
           .map((artist) => (
-            <ArtistItem
+            <GenericMediaItem
               key={artist.id}
-              artist={artist}
+              data={artist}
+              type="artist"
               onPress={() => onArtistPress(artist.id)}
             />
           ))}
@@ -470,9 +479,10 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
         {playlists
           .slice(0, activeTab === "playlists" ? playlists.length : 5)
           .map((playlist) => (
-            <PlaylistItem
+            <GenericMediaItem
               key={playlist.id}
-              playlist={playlist}
+              data={playlist}
+              type="playlist"
               onPress={() => onPlaylistPress(playlist.id)}
             />
           ))}
@@ -576,8 +586,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
           placeholder="Artists, songs, or albums"
           onChangeText={setSearchQuery}
           value={searchQuery}
-          onFocus={() => setIsSearchFocused(true)}
-          onBlur={() => setIsSearchFocused(false)}
           style={[
             styles.searchbar,
             onBack && styles.searchbarWithBack,
@@ -658,7 +666,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#121212",
   },
 
-  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -684,7 +691,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Tabs
   tabsWrapper: {
     paddingHorizontal: 16,
     paddingBottom: 16,
@@ -706,7 +712,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.25,
   },
 
-  // Content
   scrollView: {
     flex: 1,
   },
@@ -714,7 +719,6 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
   },
 
-  // Recent Searches
   recentSection: {
     paddingTop: 8,
   },
@@ -759,7 +763,6 @@ const styles = StyleSheet.create({
     margin: 0,
   },
 
-  // Sections
   section: {
     marginBottom: 32,
   },
@@ -779,7 +782,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
-  // Empty States
   emptyState: {
     flex: 1,
     justifyContent: "center",
@@ -819,7 +821,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // Skeleton
   skeletonItem: {
     flexDirection: "row",
     paddingVertical: 8,

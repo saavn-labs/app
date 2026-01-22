@@ -36,7 +36,7 @@ interface PlayerContextValue extends ServicePlayerState {
   playPrevious: () => Promise<void>;
   seekTo: (position: number) => Promise<void>;
   toggleShuffle: () => void;
-  cycleRepeatMode: () => void;
+  toggleRepeatMode: () => void;
   addToQueue: (song: Models.Song) => void;
   addNextInQueue: (song: Models.Song) => void;
   getUpNext: (limit?: number) => Models.Song[];
@@ -59,7 +59,6 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
   const [state, setState] = useState<ServicePlayerState>(
     playerService.getState(),
   );
-  const [stateRestored, setStateRestored] = useState(false);
 
   const handleStateUpdate = (newState: ServicePlayerState) => {
     setState(newState);
@@ -96,8 +95,6 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         }
       } catch (error) {
         console.error("Failed to restore player state:", error);
-      } finally {
-        setStateRestored(true);
       }
     };
 
@@ -136,7 +133,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     playPrevious: () => playerService.playPrevious(),
     seekTo: (position) => playerService.seekTo(position),
     toggleShuffle: () => playerService.toggleShuffle(),
-    cycleRepeatMode: () => playerService.cycleRepeatMode(),
+    toggleRepeatMode: () => playerService.toggleRepeatMode(),
     addToQueue: (song) => playerService.addToQueue(song),
     addNextInQueue: (song) => playerService.addNextInQueue(song),
     getUpNext: (limit) => playerService.getUpNext(limit),

@@ -26,7 +26,7 @@ export class PlayerStateService {
       };
       await AsyncStorage.setItem(PLAYER_STATE_KEY, JSON.stringify(state));
     } catch (error) {
-      console.error("❌ Error saving player state:", error);
+      console.error("Error saving player state:", error);
     }
   }
 
@@ -37,7 +37,7 @@ export class PlayerStateService {
 
       return state;
     } catch (error) {
-      console.error("❌ Error getting player state:", error);
+      console.error("Error getting player state:", error);
       return null;
     }
   }

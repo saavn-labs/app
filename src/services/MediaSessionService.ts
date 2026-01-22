@@ -64,11 +64,14 @@ export class MediaSessionService {
   private unsubscribe: (() => void) | null = null;
   private currentMetadata: MediaMetadata | null = null;
   private lastMetadataUpdate: number = 0;
-  private readonly METADATA_UPDATE_THROTTLE = 1000; // Only update metadata once per second
+  private readonly METADATA_UPDATE_THROTTLE = 1000;
 
   async initialize(handlers?: RemoteCommandHandlers) {
     try {
       if (this.isInitialized) {
+        if (handlers) {
+          this.commandHandlers = handlers;
+        }
         return;
       }
 
@@ -110,6 +113,7 @@ export class MediaSessionService {
       this.isInitialized = true;
     } catch (error) {
       console.error("Error initializing media session:", error);
+      throw error;
     }
   }
 
@@ -119,24 +123,44 @@ export class MediaSessionService {
     try {
       switch (command) {
         case Command.PLAY:
-          await this.commandHandlers.onPlay?.();
+          if (this.commandHandlers.onPlay) {
+            await this.commandHandlers.onPlay();
+          } else {
+            console.warn("No onPlay handler registered");
+          }
           break;
 
         case Command.PAUSE:
-          await this.commandHandlers.onPause?.();
+          if (this.commandHandlers.onPause) {
+            await this.commandHandlers.onPause();
+          } else {
+            console.warn("No onPause handler registered");
+          }
           break;
 
         case Command.NEXT_TRACK:
-          await this.commandHandlers.onNext?.();
+          if (this.commandHandlers.onNext) {
+            await this.commandHandlers.onNext();
+          } else {
+            console.warn("No onNext handler registered");
+          }
           break;
 
         case Command.PREVIOUS_TRACK:
-          await this.commandHandlers.onPrevious?.();
+          if (this.commandHandlers.onPrevious) {
+            await this.commandHandlers.onPrevious();
+          } else {
+            console.warn("No onPrevious handler registered");
+          }
           break;
 
         case Command.SEEK:
           if (data?.position !== undefined) {
-            await this.commandHandlers.onSeek?.(data.position);
+            if (this.commandHandlers.onSeek) {
+              await this.commandHandlers.onSeek(data.position);
+            } else {
+              console.warn("No onSeek handler registered");
+            }
           }
           break;
 
@@ -157,6 +181,9 @@ export class MediaSessionService {
             await this.commandHandlers.onSeek(newPosition);
           }
           break;
+
+        default:
+          console.warn("Unknown media control command:", command);
       }
     } catch (error) {
       console.error("Error processing media control event:", error);
@@ -178,18 +205,15 @@ export class MediaSessionService {
       const now = Date.now();
       const timeSinceLastUpdate = now - this.lastMetadataUpdate;
 
-      // Check if metadata actually changed
       const metadataChanged =
         !this.currentMetadata ||
         this.currentMetadata.title !== song.title ||
         Math.abs(this.currentMetadata.duration - duration) > 1;
 
-      // Only update if metadata changed or enough time passed
       if (
         !metadataChanged &&
         timeSinceLastUpdate < this.METADATA_UPDATE_THROTTLE
       ) {
-        // Skip update completely if nothing changed - don't even update playback state
         return;
       }
 
@@ -214,15 +238,6 @@ export class MediaSessionService {
         duration,
       };
 
-      // Only log if metadata actually changed
-      if (metadataChanged) {
-        console.log("📱 Updating media metadata:", {
-          title: song.title,
-          duration,
-        });
-      }
-
-      // Batch both updates in parallel
       await Promise.all([
         MediaControl.updateMetadata({
           title: song.title || "Unknown",
@@ -305,7 +320,7 @@ export class MediaSessionService {
     try {
       return await MediaControl.getCurrentState();
     } catch (error) {
-      console.error("❌ Error getting media state:", error);
+      console.error("Error getting media state:", error);
       return PlaybackState.STOPPED;
     }
   }

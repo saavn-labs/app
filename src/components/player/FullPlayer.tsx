@@ -1,11 +1,13 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
+import { Models } from "@saavn-labs/sdk";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
-  Image,
+  FlatList,
   Modal,
   Share,
   StyleSheet,
@@ -19,6 +21,7 @@ import {
   createColorGradient,
   extractDominantColor,
 } from "../../utils/colorUtils";
+import TrackItem from "../items/TrackItem";
 
 const { width } = Dimensions.get("window");
 
@@ -36,11 +39,13 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
     isShuffled,
     repeatMode,
     togglePlayPause,
+    playSong,
     playNext,
     playPrevious,
     seekTo,
     toggleShuffle,
-    cycleRepeatMode,
+    toggleRepeatMode,
+    getUpNext,
   } = usePlayer();
 
   const [seekValue, setSeekValue] = useState(progress);
@@ -100,14 +105,7 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
   };
 
   const getRepeatIcon = () => {
-    switch (repeatMode) {
-      case "one":
-        return "repeat-one-on";
-      case "all":
-        return "repeat";
-      default:
-        return "repeat";
-    }
+    return repeatMode ? "repeat-one-on" : "repeat";
   };
 
   const handleSeekStart = () => {
@@ -139,7 +137,7 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
     if (!currentSong) return;
     try {
       const shareUrl =
-        (currentSong as any).url ||
+        (currentSong as Models.Song).url ||
         `https://www.jiosaavn.com/song/${currentSong.id}`;
       const artistsText =
         currentSong.artists?.primary?.map((a) => a.name).join(", ") ||
@@ -158,6 +156,26 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
   };
 
   const gradient = createColorGradient(dominantColor);
+
+  const upNextTracks = getUpNext();
+
+  const handleTrackPress = async (track: Models.Song, index: number) => {
+    await playSong(track, upNextTracks, index);
+  };
+
+  const renderUpNextItem = ({
+    item,
+    index,
+  }: {
+    item: Models.Song;
+    index: number;
+  }) => (
+    <TrackItem
+      track={item}
+      onPress={() => handleTrackPress(item, index)}
+      isActive={false}
+    />
+  );
 
   if (!currentSong) return null;
 
@@ -229,7 +247,7 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
                       currentSong.images?.[0]?.url,
                   }}
                   style={styles.artwork}
-                  resizeMode="cover"
+                  contentFit="cover"
                 />
               </View>
             </View>
@@ -333,21 +351,30 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={cycleRepeatMode}
+                onPress={toggleRepeatMode}
                 style={styles.secondaryControl}
                 activeOpacity={0.7}
               >
                 <MaterialIcons
                   name={getRepeatIcon()}
                   size={26}
-                  color={
-                    repeatMode !== "off"
-                      ? "#1db954"
-                      : "rgba(255, 255, 255, 0.7)"
-                  }
+                  color={repeatMode ? "#1db954" : "rgba(255, 255, 255, 0.7)"}
                 />
               </TouchableOpacity>
             </View>
+
+            {/* Up Next */}
+            {upNextTracks.length > 0 && (
+              <View style={styles.upNextContainer}>
+                <Text style={styles.upNextHeader}>Up Next</Text>
+                <FlatList
+                  data={upNextTracks}
+                  renderItem={renderUpNextItem}
+                  keyExtractor={(item, index) => `${item.id}-${index}`}
+                  scrollEnabled={false}
+                />
+              </View>
+            )}
 
             <View style={styles.bottomSpacer} />
           </Animated.ScrollView>
@@ -514,9 +541,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   bottomSpacer: {
     height: 40,
+  },
+  upNextContainer: {
+    paddingHorizontal: 8,
+    marginTop: 32,
+    marginBottom: 16,
+  },
+  upNextHeader: {
+    color: "#ffffff",
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 16,
+    letterSpacing: 0.3,
+    paddingHorizontal: 20,
   },
 });
 

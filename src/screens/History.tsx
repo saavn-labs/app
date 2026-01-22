@@ -2,6 +2,7 @@ import TrackItem from "@/components/items/TrackItem";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { HistoryEntry, historyService } from "@/services/HistoryService";
 import { getScreenPaddingBottom } from "@/utils/designSystem";
+import { handleAsync, logError } from "@/utils/errorHandler";
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
@@ -41,7 +42,6 @@ export default function HistoryScreen() {
   }, []);
 
   const groupHistoryByDate = (history: HistoryEntry[]): HistorySection[] => {
-    // Only keep entries from today
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -62,33 +62,44 @@ export default function HistoryScreen() {
   };
 
   const loadHistory = async () => {
-    try {
-      setLoading(true);
+    setLoading(true);
+
+    const result = await handleAsync(async () => {
       const data = await historyService.getHistory();
       const groupedSections = groupHistoryByDate(data);
-      setSections(groupedSections);
-    } catch (error) {
-      console.error("Error loading history:", error);
-    } finally {
-      setLoading(false);
+      return groupedSections;
+    }, "Failed to load history");
+
+    if (result.success && result.data) {
+      setSections(result.data);
+    } else {
+      logError("HistoryScreen.loadHistory", result.error);
+      setSections([]);
     }
+
+    setLoading(false);
   };
 
   const handlePlaySong = async (entry: HistoryEntry) => {
-    try {
-      await playSong(entry.song);
-    } catch (error) {
-      console.error("Error playing song:", error);
-      Alert.alert("Error", "Failed to play song");
+    const result = await handleAsync(
+      async () => await playSong(entry.song),
+      "Failed to play song",
+    );
+
+    if (!result.success) {
+      Alert.alert("Error", result.error || "Failed to play song");
+      logError("HistoryScreen.handlePlaySong", result.error);
     }
   };
 
   const handleRemoveFromHistory = async (songId: string) => {
-    try {
+    const result = await handleAsync(async () => {
       await historyService.removeFromHistory(songId);
       await loadHistory();
-    } catch (error) {
-      console.error("Error removing from history:", error);
+    }, "Failed to remove from history");
+
+    if (!result.success) {
+      logError("HistoryScreen.handleRemoveFromHistory", result.error);
     }
   };
 
@@ -102,11 +113,14 @@ export default function HistoryScreen() {
           text: "Clear All",
           style: "destructive",
           onPress: async () => {
-            try {
+            const result = await handleAsync(async () => {
               await historyService.clearHistory();
               await loadHistory();
-            } catch (error) {
-              console.error("Error clearing history:", error);
+            }, "Failed to clear history");
+
+            if (!result.success) {
+              Alert.alert("Error", result.error || "Failed to clear history");
+              logError("HistoryScreen.handleClearHistory", result.error);
             }
           },
         },

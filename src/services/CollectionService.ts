@@ -10,7 +10,7 @@ export interface Collection {
   songs: Models.Song[];
   createdAt: string;
   updatedAt: string;
-  coverUrl?: string; // URL of the first song's image
+  coverUrl?: string;
 }
 
 /**
@@ -123,13 +123,11 @@ export class CollectionService {
       const collection = collections.find((c) => c.id === collectionId);
 
       if (collection) {
-        // Prevent duplicates
         const exists = collection.songs.some((s) => s.id === song.id);
         if (!exists) {
           collection.songs.push(song);
           collection.updatedAt = new Date().toISOString();
 
-          // Update cover with first song image if not set
           if (!collection.coverUrl && song.images && song.images.length > 0) {
             collection.coverUrl = song.images[0].url;
           }
@@ -166,7 +164,6 @@ export class CollectionService {
 
         collection.updatedAt = new Date().toISOString();
 
-        // Update cover if empty
         if (!collection.coverUrl && collection.songs.length > 0) {
           const firstSong = collection.songs[0];
           if (firstSong.images && firstSong.images.length > 0) {
@@ -197,7 +194,6 @@ export class CollectionService {
         collection.songs = collection.songs.filter((s) => s.id !== songId);
         collection.updatedAt = new Date().toISOString();
 
-        // Update cover if current one is removed
         if (collection.songs.length === 0) {
           collection.coverUrl = undefined;
         }

@@ -1,12 +1,12 @@
-import AlbumItem from "@/components/items/AlbumItem";
-import PlaylistItem from "@/components/items/PlaylistItem";
-import TrackItem from "@/components/items/TrackItem";
+import { GenericMediaItem, TrackItem } from "@/components";
+import { AUDIO_QUALITY, COLORS } from "@/constants";
 import { usePlayer } from "@/contexts/PlayerContext";
+import { storageService } from "@/services/StorageService";
 import { getScreenPaddingBottom } from "@/utils/designSystem";
+import { handleAsync, logError } from "@/utils/errorHandler";
 import { Album, Models, Playlist, Song } from "@saavn-labs/sdk";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -18,7 +18,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Chip, IconButton, Text } from "react-native-paper";
+import {
+  Chip,
+  IconButton,
+  Modal,
+  Portal,
+  RadioButton,
+  Text,
+} from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface HomeScreenProps {
@@ -33,43 +40,60 @@ interface Section {
   type: "albums" | "playlists" | "songs";
 }
 
+const LANGUAGES = ["hindi", "english", "punjabi", "tamil", "telugu"];
+const TRENDING_LIMIT = 10;
+const RECENTLY_PLAYED_LIMIT = 6;
+
 const HomeScreen: React.FC<HomeScreenProps> = ({
   onAlbumPress,
   onPlaylistPress,
   onSearchFocus,
 }) => {
-  const router = useRouter();
   const { playSong, currentSong } = usePlayer();
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState("hindi");
-  const [greeting, setGreeting] = useState("");
   const [recentlyPlayed, setRecentlyPlayed] = useState<any[]>([]);
+  const [settingsModalVisible, setSettingsModalVisible] = useState(false);
+  const [contentQuality, setContentQuality] =
+    useState<keyof typeof AUDIO_QUALITY>("MEDIUM");
 
-  const languages = ["hindi", "english", "punjabi", "tamil", "telugu"];
   const { width } = Dimensions.get("window");
   const insets = useSafeAreaInsets();
   const bottomPadding = getScreenPaddingBottom(true, true) + insets.bottom;
 
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  }, []);
+
   useEffect(() => {
-    setGreeting(getGreeting());
+    loadUserPreferences();
   }, []);
 
   useEffect(() => {
     loadHomeData();
   }, [selectedLanguage]);
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
-    return "Good evening";
-  };
+  const loadUserPreferences = useCallback(async () => {
+    const result = await handleAsync(async () => {
+      const quality = await storageService.getContentQuality();
+      return quality;
+    }, "Failed to load user preferences");
 
-  const loadHomeData = async () => {
-    try {
-      setLoading(true);
+    if (result.success && result.data) {
+      setContentQuality(result.data as keyof typeof AUDIO_QUALITY);
+    }
+  }, []);
 
+  const loadHomeData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    const result = await handleAsync(async () => {
       const [trendingAlbums, trendingPlaylists, trendingSongs] =
         await Promise.all([
           Album.getTrending({ language: selectedLanguage }),
@@ -77,18 +101,26 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           Song.getTrending({ language: selectedLanguage }),
         ]);
 
+      return { trendingAlbums, trendingPlaylists, trendingSongs };
+    }, "Failed to load home data");
+
+    if (result.success && result.data) {
+      const { trendingAlbums, trendingPlaylists, trendingSongs } = result.data;
+
+      // Build recently played from trending items
       const mockRecentlyPlayed = [
         ...trendingAlbums.slice(0, 3),
         ...trendingPlaylists.slice(0, 3),
-      ].slice(0, 6);
+      ].slice(0, RECENTLY_PLAYED_LIMIT);
       setRecentlyPlayed(mockRecentlyPlayed);
 
+      // Build sections
       const newSections: Section[] = [];
 
       if (trendingSongs.length > 0) {
         newSections.push({
           title: "Trending Songs",
-          data: trendingSongs.slice(0, 10),
+          data: trendingSongs.slice(0, TRENDING_LIMIT),
           type: "songs",
         });
       }
@@ -96,7 +128,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       if (trendingAlbums.length > 0) {
         newSections.push({
           title: "Trending Albums",
-          data: trendingAlbums.slice(0, 10),
+          data: trendingAlbums.slice(0, TRENDING_LIMIT),
           type: "albums",
         });
       }
@@ -104,23 +136,27 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       if (trendingPlaylists.length > 0) {
         newSections.push({
           title: "Featured Playlists",
-          data: trendingPlaylists.slice(0, 10),
+          data: trendingPlaylists.slice(0, TRENDING_LIMIT),
           type: "playlists",
         });
       }
 
       setSections(newSections);
-    } catch (error) {
-      console.error("Error loading home data:", error);
-    } finally {
-      setLoading(false);
+    } else {
+      setError(result.error || "Failed to load home data");
+      logError("HomeScreen.loadHomeData", result.error);
     }
-  };
 
-  const handleTrackPress = (track: Models.Song, allTracks: Models.Song[]) => {
-    const index = allTracks.findIndex((t) => t.id === track.id);
-    playSong(track, allTracks, index);
-  };
+    setLoading(false);
+  }, [selectedLanguage]);
+
+  const handleTrackPress = useCallback(
+    (track: Models.Song, allTracks: Models.Song[]) => {
+      const index = allTracks.findIndex((t) => t.id === track.id);
+      playSong(track, allTracks, index);
+    },
+    [playSong],
+  );
 
   const renderHorizontalList = (section: Section) => {
     if (section.type === "albums") {
@@ -131,8 +167,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.horizontalList}
           renderItem={({ item }) => (
-            <AlbumItem
-              album={item}
+            <GenericMediaItem
+              data={item}
+              type="album"
               onPress={() => onAlbumPress(item.id)}
               horizontal
             />
@@ -150,8 +187,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.horizontalList}
           renderItem={({ item }) => (
-            <PlaylistItem
-              playlist={item}
+            <GenericMediaItem
+              data={item}
+              type="playlist"
               onPress={() => onPlaylistPress(item.id)}
               horizontal
             />
@@ -219,9 +257,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     );
   };
 
-  const onHistoryPress = () => {
-    router.push("/history");
+  const onSettingsPress = () => {
+    setSettingsModalVisible(true);
   };
+
+  const handleQualityChange = useCallback(
+    async (quality: keyof typeof AUDIO_QUALITY) => {
+      setContentQuality(quality);
+
+      const result = await handleAsync(
+        async () => await storageService.saveContentQuality(quality),
+        "Failed to save content quality",
+      );
+
+      if (!result.success) {
+        logError("HomeScreen.handleQualityChange", result.error);
+      }
+    },
+    [],
+  );
 
   return (
     <View style={styles.container}>
@@ -241,10 +295,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </Text>
             <View style={styles.headerIcons}>
               <IconButton
-                icon="history"
+                icon="cog"
                 iconColor="#fff"
                 size={24}
-                onPress={onHistoryPress}
+                onPress={onSettingsPress}
               />
             </View>
           </View>
@@ -285,7 +339,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 contentContainerStyle={styles.languageChips}
                 style={styles.languageChipsContainer}
               >
-                {languages.map((lang) => (
+                {LANGUAGES.map((lang) => (
                   <Chip
                     key={lang}
                     onPress={() => setSelectedLanguage(lang)}
@@ -304,12 +358,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 ))}
               </ScrollView>
 
-              {/* Recently Played */}
               {recentlyPlayed.length > 0 && (
                 <View style={styles.section}>{renderRecentlyPlayedGrid()}</View>
               )}
 
-              {/* Made for you sections */}
               {sections.map((section, index) => (
                 <View key={`${section.title}-${index}`} style={styles.section}>
                   <Text variant="titleLarge" style={styles.sectionTitle}>
@@ -322,6 +374,55 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </ScrollView>
       </View>
+
+      {/* Settings Modal */}
+      <Portal>
+        <Modal
+          visible={settingsModalVisible}
+          onDismiss={() => setSettingsModalVisible(false)}
+          contentContainerStyle={styles.modalContainer}
+        >
+          <Text variant="headlineSmall" style={styles.modalTitle}>
+            Settings
+          </Text>
+
+          <View style={styles.settingSection}>
+            <Text variant="titleMedium" style={styles.settingLabel}>
+              Content Quality
+            </Text>
+
+            <RadioButton.Group
+              onValueChange={(value) =>
+                handleQualityChange(value as keyof typeof AUDIO_QUALITY)
+              }
+              value={contentQuality}
+            >
+              <View style={styles.radioOption}>
+                <RadioButton.Android value="LOW" color={COLORS.PRIMARY} />
+                <Text style={styles.radioLabel}>Low</Text>
+              </View>
+
+              <View style={styles.radioOption}>
+                <RadioButton.Android value="MEDIUM" color={COLORS.PRIMARY} />
+                <Text style={styles.radioLabel}>Medium</Text>
+              </View>
+
+              <View style={styles.radioOption}>
+                <RadioButton.Android value="HIGH" color={COLORS.PRIMARY} />
+                <Text style={styles.radioLabel}>High</Text>
+              </View>
+            </RadioButton.Group>
+          </View>
+
+          <TouchableOpacity
+            style={styles.modalCloseButton}
+            onPress={() => setSettingsModalVisible(false)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.modalCloseButtonText}>Close</Text>
+          </TouchableOpacity>
+        </Modal>
+      </Portal>
     </View>
   );
 };
@@ -329,14 +430,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212",
+    backgroundColor: COLORS.BACKGROUND,
   },
   scrollView: {
     flex: 1,
   },
   contentContainer: {
     flex: 1,
-    backgroundColor: "#121212",
+    backgroundColor: COLORS.BACKGROUND,
   },
   scrollContent: {
     flexGrow: 1,
@@ -457,6 +558,47 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     backgroundColor: "transparent",
+  },
+  modalContainer: {
+    backgroundColor: "#282828",
+    marginHorizontal: 20,
+    padding: 24,
+    borderRadius: 16,
+  },
+  modalTitle: {
+    color: "#fff",
+    fontWeight: "bold",
+    marginBottom: 24,
+  },
+  settingSection: {
+    marginBottom: 24,
+  },
+  settingLabel: {
+    color: "#fff",
+    marginBottom: 16,
+    fontWeight: "600",
+  },
+  radioOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  radioLabel: {
+    color: "#fff",
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  modalCloseButton: {
+    backgroundColor: "#1db954",
+    paddingVertical: 14,
+    borderRadius: 24,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  modalCloseButtonText: {
+    color: "#000",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
 
