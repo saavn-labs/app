@@ -16,7 +16,7 @@ export const extractDominantColor = async (
     });
 
     const color =
-      (result.platform === "android" && result.dominant) || fallbackColor;
+      (result.platform === "android" && result.darkVibrant) || fallbackColor;
 
     return { color };
   } catch (error) {

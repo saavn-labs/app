@@ -2,7 +2,6 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useState } from "react";
 import {
-  Animated,
   Image,
   StyleSheet,
   TouchableOpacity,
@@ -10,12 +9,13 @@ import {
   ViewStyle,
 } from "react-native";
 import { Text } from "react-native-paper";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePlayer } from "../../contexts/PlayerContext";
 import {
   createColorGradient,
   extractDominantColor,
 } from "../../utils/colorUtils";
-import { spacing } from "../../utils/designSystem";
 
 interface CompactPlayerProps {
   onPress: () => void;
@@ -28,7 +28,14 @@ const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
   const { currentSong, status, progress, duration, togglePlayPause, playNext } =
     usePlayer();
   const [dominantColor, setDominantColor] = useState(DEFAULT_COLOR);
-  const [scaleAnim] = useState(new Animated.Value(1));
+  const insets = useSafeAreaInsets();
+
+  let tabBarHeight = 0;
+  try {
+    tabBarHeight = useBottomTabBarHeight();
+  } catch (e) {
+    tabBarHeight = 0;
+  }
 
   useEffect(() => {
     if (currentSong?.images?.[0]?.url) {
@@ -43,13 +50,15 @@ const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
   const progressPercent = duration > 0 ? progress / duration : 0;
   const gradient = createColorGradient(dominantColor);
 
-  const handleNextPress = (e: any) => {
-    e.stopPropagation();
-    playNext();
+  const dynamicPosition: ViewStyle = {
+    position: "absolute",
+    left: 8,
+    right: 8,
+    bottom: tabBarHeight > 0 ? tabBarHeight + 8 : insets.bottom + 8,
   };
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, dynamicPosition, style]}>
       <LinearGradient
         colors={gradient}
         start={{ x: 0, y: 0 }}
@@ -106,21 +115,22 @@ const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
               onPress={togglePlayPause}
               style={styles.playButton}
               activeOpacity={0.8}
-              disabled={status === "loading"}
             >
               <MaterialIcons
                 name={status === "playing" ? "pause" : "play-arrow"}
                 size={28}
-                color="#FFFFFF"
+                color="#FFF"
               />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={handleNextPress}
+              onPress={(e) => {
+                e.stopPropagation();
+                playNext();
+              }}
               style={styles.nextButton}
               activeOpacity={0.8}
-              disabled={status === "loading"}
             >
-              <MaterialIcons name="skip-next" size={34} color="#FFFFFF" />
+              <MaterialIcons name="skip-next" size={34} color="#FFF" />
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -131,27 +141,25 @@ const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 8,
-    marginBottom: spacing.xs,
+    borderRadius: 12,
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    zIndex: 1000,
   },
   gradient: {
-    borderRadius: 8,
-    flex: 1,
+    borderRadius: 12,
   },
   progressBarContainer: {
     height: 2,
     backgroundColor: "rgba(255, 255, 255, 0.15)",
-    width: "100%",
   },
   progressBarFill: {
-    height: "100%",
-    backgroundColor: "#FFFFFF",
+    height: 2,
+    backgroundColor: "#FFF",
   },
   content: {
     flexDirection: "row",
@@ -176,44 +184,40 @@ const styles = StyleSheet.create({
   artwork: {
     width: 48,
     height: 48,
-    borderRadius: 4,
+    borderRadius: 6,
     marginRight: 12,
   },
   textContainer: {
     flex: 1,
     minWidth: 0,
-    justifyContent: "center",
   },
   title: {
-    fontWeight: "600",
+    fontWeight: "700",
     marginBottom: 2,
-    color: "#FFFFFF",
+    color: "#FFF",
     fontSize: 14,
-    letterSpacing: 0.1,
   },
   subtitle: {
     fontSize: 12,
-    color: "rgba(255, 255, 255, 0.75)",
-    letterSpacing: 0.1,
+    color: "rgba(255, 255, 255, 0.8)",
   },
   controls: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    marginLeft: 20,
+    gap: 8,
+    marginLeft: 12,
   },
   playButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
     justifyContent: "center",
     alignItems: "center",
   },
   nextButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
     justifyContent: "center",
     alignItems: "center",
   },

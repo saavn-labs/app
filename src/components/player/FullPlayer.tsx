@@ -1,26 +1,24 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
-import { Models } from "@saavn-labs/sdk";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
   Image,
   Modal,
-  ScrollView,
+  Share,
   StyleSheet,
   TouchableOpacity,
   View,
 } from "react-native";
-import { Text, useTheme } from "react-native-paper";
+import { Text } from "react-native-paper";
 import { usePlayer } from "../../contexts/PlayerContext";
 import { storageService } from "../../services/StorageService";
 import {
   createColorGradient,
   extractDominantColor,
 } from "../../utils/colorUtils";
-import { TrackItem } from "../items";
 
 const { width } = Dimensions.get("window");
 
@@ -35,12 +33,9 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
     status,
     progress,
     duration,
-    queue,
-    currentIndex,
     isShuffled,
     repeatMode,
     togglePlayPause,
-    playSong,
     playNext,
     playPrevious,
     seekTo,
@@ -48,7 +43,6 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
     cycleRepeatMode,
   } = usePlayer();
 
-  const [showQueue, setShowQueue] = useState(false);
   const [seekValue, setSeekValue] = useState(progress);
   const [isDragging, setIsDragging] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
@@ -141,13 +135,27 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
     }
   };
 
-  const handleTrackPress = useCallback(
-    (track: Models.Song) => {
-      const trackIndex = queue.findIndex((t) => t.id === track.id);
-      playSong(track, queue, trackIndex);
-    },
-    [queue, playSong],
-  );
+  const handleShare = async () => {
+    if (!currentSong) return;
+    try {
+      const shareUrl =
+        (currentSong as any).url ||
+        `https://www.jiosaavn.com/song/${currentSong.id}`;
+      const artistsText =
+        currentSong.artists?.primary?.map((a) => a.name).join(", ") ||
+        currentSong.subtitle ||
+        "";
+      const message = `Check out "${currentSong.title}" by ${artistsText} on JioSaavn`;
+
+      await Share.share({
+        message: `${message}\n${shareUrl}`,
+        url: shareUrl,
+        title: currentSong.title,
+      });
+    } catch (error) {
+      console.error("Error sharing from FullPlayer:", error);
+    }
+  };
 
   const gradient = createColorGradient(dominantColor);
 
@@ -179,7 +187,7 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
             },
           ]}
         >
-          <ScrollView
+          <Animated.ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
@@ -199,13 +207,13 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
               </TouchableOpacity>
               <View style={styles.headerCenter}>
                 <Text variant="labelMedium" style={styles.headerTitle}>
-                  Playing from {queue.length > 0 ? "Queue" : "Search"}
+                  Now Playing
                 </Text>
               </View>
               <TouchableOpacity
                 style={styles.headerButton}
                 activeOpacity={0.7}
-                onPress={() => {}}
+                onPress={handleShare}
               >
                 <MaterialIcons name="share" size={28} color="#ffffff" />
               </TouchableOpacity>
@@ -341,37 +349,8 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.queueContainer}>
-              <View style={styles.queueHeader}>
-                <Text variant="titleLarge" style={styles.queueTitle}>
-                  Up Next
-                </Text>
-                <Text variant="bodyMedium" style={styles.queueCount}>
-                  {queue.length} song{queue.length !== 1 ? "s" : ""}
-                </Text>
-              </View>
-              <View style={styles.queueList}>
-                {queue.map((song, index) => (
-                  <View
-                    key={`${song.id}-${index}`}
-                    style={[
-                      styles.queueItemWrapper,
-                      index === currentIndex && styles.currentQueueItem,
-                    ]}
-                  >
-                    <TrackItem
-                      track={song}
-                      onPress={() => handleTrackPress(song)}
-                      showArtwork={true}
-                      isActive={index === currentIndex}
-                    />
-                  </View>
-                ))}
-              </View>
-            </View>
-
             <View style={styles.bottomSpacer} />
-          </ScrollView>
+          </Animated.ScrollView>
         </Animated.View>
       </LinearGradient>
     </Modal>
@@ -534,39 +513,6 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: "center",
     alignItems: "center",
-  },
-
-  queueContainer: {
-    marginTop: 32,
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.1)",
-  },
-  queueHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    marginBottom: 16,
-  },
-  queueTitle: {
-    fontWeight: "800",
-    color: "#ffffff",
-  },
-  queueCount: {
-    color: "rgba(255, 255, 255, 0.6)",
-    fontWeight: "500",
-  },
-  queueList: {
-    paddingHorizontal: 8,
-  },
-  queueItemWrapper: {
-    borderRadius: 8,
-    overflow: "hidden",
-    marginBottom: 4,
-  },
-  currentQueueItem: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
   },
 
   bottomSpacer: {

@@ -1,8 +1,10 @@
+import { CompactPlayer, FullPlayer } from "@/components";
 import EmptyState from "@/components/common/EmptyState";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
 import AlbumItem from "@/components/items/AlbumItem";
 import TrackItem from "@/components/items/TrackItem";
 import { usePlayer } from "@/contexts/PlayerContext";
+import { getScreenPaddingBottom } from "@/utils/designSystem";
 import { Album, Artist, Models, Playlist } from "@saavn-labs/sdk";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -18,8 +20,9 @@ import {
   View,
 } from "react-native";
 import { IconButton, Text, useTheme } from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 
 type DetailType = "album" | "playlist" | "artist";
 
@@ -54,6 +57,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
   onAlbumPress,
 }) => {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { playSong, currentSong, toggleShuffle, isShuffled } = usePlayer();
 
   const [data, setData] = useState<DetailData | null>(null);
@@ -62,8 +66,10 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<"songs" | "albums">("songs");
   const [dominantColor, setDominantColor] = useState("#1a1a1a");
+  const [isFullPlayerVisible, setFullPlayerVisible] = useState(false);
 
   const scrollY = React.useRef(new Animated.Value(0)).current;
+  const bottomPadding = getScreenPaddingBottom(true, false) + insets.bottom;
 
   useEffect(() => {
     loadData();
@@ -446,7 +452,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
             </View>
           </View>
 
-          <View style={{ height: 120 }} />
+          <View style={{ height: bottomPadding + 20 }} />
         </Animated.ScrollView>
       </View>
     );
@@ -643,8 +649,18 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
           </View>
         </View>
 
-        <View style={{ height: 120 }} />
+        <View style={{ height: bottomPadding + 20 }} />
       </Animated.ScrollView>
+
+      <CompactPlayer
+        onPress={() => setFullPlayerVisible(true)}
+        style={styles.compactPlayerOffset}
+      />
+
+      <FullPlayer
+        visible={isFullPlayerVisible}
+        onClose={() => setFullPlayerVisible(false)}
+      />
     </View>
   );
 };
@@ -654,7 +670,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#121212",
   },
-
+  compactPlayerOffset: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    right: 8,
+    zIndex: 10,
+  },
   fixedHeader: {
     position: "absolute",
     top: 0,

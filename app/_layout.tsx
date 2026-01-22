@@ -1,26 +1,20 @@
-import CompactPlayer from "@/components/player/CompactPlayer";
-import FullPlayer from "@/components/player/FullPlayer";
 import { PlayerProvider } from "@/contexts/PlayerContext";
 import { useFonts } from "expo-font";
-import { Stack, usePathname } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { setStatusBarBackgroundColor, StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   Text as RNText,
   TextInput as RNTextInput,
   StyleSheet,
-  View,
 } from "react-native";
 import {
   configureFonts,
   MD3DarkTheme,
   PaperProvider,
 } from "react-native-paper";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -53,13 +47,6 @@ export default function Layout() {
   const [fontsLoaded, fontError] = useFonts({
     SpotifyMedium: require("../assets/fonts/SpotifyMedium.ttf"),
   });
-  const [showFullPlayer, setShowFullPlayer] = useState(false);
-  const pathname = usePathname();
-  const insets = useSafeAreaInsets();
-
-  const isDetailScreen = /^(\/album\/|\/artist\/|\/playlist\/)/.test(pathname);
-  const TAB_BAR_BASE_HEIGHT = 50;
-  const playerBottom = isDetailScreen ? 0 : TAB_BAR_BASE_HEIGHT + insets.bottom;
 
   useEffect(() => {
     if (fontsLoaded) {
@@ -97,7 +84,7 @@ export default function Layout() {
 
   return (
     <PaperProvider theme={theme}>
-      <StatusBar backgroundColor="#121212" style="light" />
+      <StatusBar backgroundColor="#121212" style="dark" />
       <PlayerProvider>
         <SafeAreaView
           style={styles.root}
@@ -106,14 +93,14 @@ export default function Layout() {
           <Stack
             screenOptions={{
               headerShown: false,
-              contentStyle: { backgroundColor: "#121212" },
+              contentStyle: styles.screenStyle,
             }}
           >
             <Stack.Screen
               name="(tabs)"
               options={{
                 headerShown: false,
-                contentStyle: { backgroundColor: "#121212" },
+                contentStyle: styles.screenStyle,
               }}
             />
             <Stack.Screen
@@ -121,7 +108,7 @@ export default function Layout() {
               options={{
                 presentation: "modal",
                 headerShown: false,
-                contentStyle: { backgroundColor: "#121212" },
+                contentStyle: styles.screenStyle,
               }}
             />
             <Stack.Screen
@@ -129,7 +116,7 @@ export default function Layout() {
               options={{
                 presentation: "modal",
                 headerShown: false,
-                contentStyle: { backgroundColor: "#121212" },
+                contentStyle: styles.screenStyle,
               }}
             />
             <Stack.Screen
@@ -137,19 +124,10 @@ export default function Layout() {
               options={{
                 presentation: "modal",
                 headerShown: false,
-                contentStyle: { backgroundColor: "#121212" },
+                contentStyle: styles.screenStyle,
               }}
             />
           </Stack>
-
-          <View style={[styles.playerContainer, { bottom: playerBottom }]}>
-            <CompactPlayer onPress={() => setShowFullPlayer(true)} />
-          </View>
-
-          <FullPlayer
-            visible={showFullPlayer}
-            onClose={() => setShowFullPlayer(false)}
-          />
         </SafeAreaView>
       </PlayerProvider>
     </PaperProvider>
@@ -161,13 +139,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#121212",
   },
-  playerContainer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    pointerEvents: "box-none",
+  screenStyle: {
+    backgroundColor: "#121212",
   },
 });

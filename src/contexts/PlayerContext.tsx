@@ -3,12 +3,11 @@ import { useAudioPlayer } from "expo-audio";
 import React, {
   createContext,
   ReactNode,
-  useCallback,
   useContext,
   useEffect,
-  useMemo,
   useState,
 } from "react";
+import { AppState } from "react-native";
 import { audioService } from "../services/AudioService";
 import {
   playerService,
@@ -62,12 +61,16 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
   );
   const [stateRestored, setStateRestored] = useState(false);
 
-  const handleStateUpdate = useCallback((newState: ServicePlayerState) => {
+  const handleStateUpdate = (newState: ServicePlayerState) => {
     setState(newState);
-  }, []);
+  };
 
   useEffect(() => {
-    audioService.setPlayer(audioPlayer);
+    try {
+      audioService.setPlayer(audioPlayer);
+    } catch (error) {
+      console.error("Failed to set audio player:", error);
+    }
   }, [audioPlayer]);
 
   useEffect(() => {
@@ -79,16 +82,17 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
           savedState.currentSong &&
           savedState.seekPosition >= 0
         ) {
-          await playerService.playSong(
-            savedState.currentSong,
-            [savedState.currentSong],
-            0,
-          );
-
-          setTimeout(async () => {
+          try {
+            await playerService.playSong(
+              savedState.currentSong,
+              [savedState.currentSong],
+              0,
+            );
             await playerService.seekTo(savedState.seekPosition);
             await playerService.pause();
-          }, 1000);
+          } catch (error) {
+            console.warn("Failed to restore player state:", error);
+          }
         }
       } catch (error) {
         console.error("Failed to restore player state:", error);
@@ -102,80 +106,41 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = playerService.subscribe(handleStateUpdate);
-
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [handleStateUpdate]);
 
-  const playSong = useCallback(
-    (song: Models.Song, queue?: Models.Song[], startIndex?: number) =>
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "background" || state === "inactive") {
+        void playerService.ensureBackgroundPlayback();
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      void playerService.release();
+    };
+  }, []);
+
+  const contextValue: PlayerContextValue = {
+    ...state,
+    playSong: (song, queue, startIndex) =>
       playerService.playSong(song, queue, startIndex),
-    [],
-  );
-
-  const play = useCallback(() => playerService.play(), []);
-  const pause = useCallback(() => playerService.pause(), []);
-  const togglePlayPause = useCallback(
-    () => playerService.togglePlayPause(),
-    [],
-  );
-  const playNext = useCallback(() => playerService.playNext(), []);
-  const playPrevious = useCallback(() => playerService.playPrevious(), []);
-  const seekTo = useCallback(
-    (position: number) => playerService.seekTo(position),
-    [],
-  );
-  const toggleShuffle = useCallback(() => playerService.toggleShuffle(), []);
-  const cycleRepeatMode = useCallback(
-    () => playerService.cycleRepeatMode(),
-    [],
-  );
-  const addToQueue = useCallback(
-    (song: Models.Song) => playerService.addToQueue(song),
-    [],
-  );
-  const addNextInQueue = useCallback(
-    (song: Models.Song) => playerService.addNextInQueue(song),
-    [],
-  );
-  const getUpNext = useCallback(
-    (limit?: number) => playerService.getUpNext(limit),
-    [],
-  );
-
-  const contextValue: PlayerContextValue = useMemo(
-    () => ({
-      ...state,
-      playSong,
-      play,
-      pause,
-      togglePlayPause,
-      playNext,
-      playPrevious,
-      seekTo,
-      toggleShuffle,
-      cycleRepeatMode,
-      addToQueue,
-      addNextInQueue,
-      getUpNext,
-    }),
-    [
-      state,
-      playSong,
-      play,
-      pause,
-      togglePlayPause,
-      playNext,
-      playPrevious,
-      seekTo,
-      toggleShuffle,
-      cycleRepeatMode,
-      addToQueue,
-      addNextInQueue,
-      getUpNext,
-    ],
-  );
+    play: () => playerService.play(),
+    pause: () => playerService.pause(),
+    togglePlayPause: () => playerService.togglePlayPause(),
+    playNext: () => playerService.playNext(),
+    playPrevious: () => playerService.playPrevious(),
+    seekTo: (position) => playerService.seekTo(position),
+    toggleShuffle: () => playerService.toggleShuffle(),
+    cycleRepeatMode: () => playerService.cycleRepeatMode(),
+    addToQueue: (song) => playerService.addToQueue(song),
+    addNextInQueue: (song) => playerService.addNextInQueue(song),
+    getUpNext: (limit) => playerService.getUpNext(limit),
+  };
 
   return (
     <PlayerContext.Provider value={contextValue}>

@@ -2,6 +2,8 @@ import TrackItem from "@/components/items/TrackItem";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Collection, collectionService } from "@/services/CollectionService";
 import { storageService } from "@/services/StorageService";
+import { getScreenPaddingBottom } from "@/utils/designSystem";
+
 import { MaterialIcons } from "@expo/vector-icons";
 import { Models } from "@saavn-labs/sdk";
 import { LinearGradient } from "expo-linear-gradient";
@@ -18,6 +20,7 @@ import {
   View,
 } from "react-native";
 import { IconButton, Text, useTheme } from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type LibraryTab = "songs" | "collections";
 
@@ -38,6 +41,8 @@ const GRADIENT_COLORS = [
 
 const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const bottomPadding = getScreenPaddingBottom(true, true) + insets.bottom;
   const { playSong, currentSong, toggleShuffle } = usePlayer();
   const [activeTab, setActiveTab] = useState<LibraryTab>("songs");
   const [favorites, setFavorites] = useState<Models.Song[]>([]);
@@ -268,7 +273,13 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
       <View style={styles.contentContainer}>
         {/* Header */}
         <LinearGradient
-          colors={[...gradientColors, theme.colors.background]}
+          colors={
+            [
+              gradientColors[0],
+              gradientColors[1],
+              theme.colors.background,
+            ] as const
+          }
           style={styles.collectionDetailHeader}
         >
           <IconButton
@@ -381,7 +392,7 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
         activeOpacity={0.7}
       >
         <LinearGradient
-          colors={gradientColors}
+          colors={[gradientColors[0], gradientColors[1]] as const}
           style={styles.collectionCover}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -507,7 +518,10 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
       {/* Content */}
       <Animated.ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: bottomPadding },
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -528,14 +542,19 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
           : activeTab === "songs"
             ? renderFavoriteSongs()
             : renderCollectionsList()}
-        <View style={styles.bottomPadding} />
       </Animated.ScrollView>
 
       {/* FAB for Creating Collections */}
       {activeTab === "collections" && !selectedCollection && (
         <TouchableOpacity
           onPress={() => setShowCreateModal(true)}
-          style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+          style={[
+            styles.fab,
+            {
+              backgroundColor: theme.colors.primary,
+              bottom: bottomPadding + 8,
+            },
+          ]}
           activeOpacity={0.8}
         >
           <MaterialIcons name="add" size={28} color="#000000" />
@@ -623,9 +642,9 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#121212",
   },
 
-  // Fixed Header
   fixedHeader: {
     position: "absolute",
     top: 0,
@@ -866,7 +885,6 @@ const styles = StyleSheet.create({
   // FAB
   fab: {
     position: "absolute",
-    bottom: 90,
     right: 20,
     width: 56,
     height: 56,
@@ -931,7 +949,7 @@ const styles = StyleSheet.create({
   },
 
   bottomPadding: {
-    height: 120,
+    backgroundColor: "transparent",
   },
 });
 

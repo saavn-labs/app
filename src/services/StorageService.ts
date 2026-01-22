@@ -6,7 +6,6 @@ const KEYS = {
   RECENT_SEARCHES: "@recent_searches",
 };
 
-
 /**
  * StorageService - Manages favorites and recent searches
  * For collections/playlists, use CollectionService

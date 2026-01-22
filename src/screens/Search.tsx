@@ -4,6 +4,7 @@ import PlaylistItem from "@/components/items/PlaylistItem";
 import TrackItem from "@/components/items/TrackItem";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { storageService } from "@/services/StorageService";
+import { getScreenPaddingBottom } from "@/utils/designSystem";
 import { Album, Artist, Extras, Models, Playlist, Song } from "@saavn-labs/sdk";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -15,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { IconButton, Searchbar, Text, useTheme } from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
@@ -177,6 +179,8 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
 }) => {
   const theme = useTheme();
   const { playSong, currentSong } = usePlayer();
+  const insets = useSafeAreaInsets();
+  const bottomPadding = getScreenPaddingBottom(true, true) + insets.bottom;
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<SearchTab>("all");
@@ -353,8 +357,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
 
   const handleTrackPress = useCallback(
     (track: Models.Song) => {
-      const index = results.songs.findIndex((t) => t.id === track.id);
-      playSong(track, results.songs, index);
+      playSong(track);
     },
     [results.songs, playSong],
   );
@@ -632,7 +635,10 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
       {/* Results */}
       <Animated.ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: bottomPadding },
+        ]}
         showsVerticalScrollIndicator={false}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -649,6 +655,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#121212",
   },
 
   // Header
@@ -704,7 +711,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 120,
+    paddingBottom: 0,
   },
 
   // Recent Searches

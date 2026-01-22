@@ -8,6 +8,9 @@ export class QueueService {
   private shuffled: boolean = false;
   private repeatMode: RepeatMode = "off";
   private playedIndices: Set<number> = new Set();
+  private readonly maxPrevious: number = 10;
+  private readonly minAfter: number = 1;
+  private readonly maxAfter: number = 9;
 
   async fetchRecommendations(
     seedSongId: string,
@@ -42,7 +45,10 @@ export class QueueService {
   }
 
   appendQueue(songs: Models.Song[]) {
-    this.cleanupSkippedSongs();
+    // Only cleanup if we have skipped songs to reclaim memory
+    if (this.playedIndices.size < this.currentIndex) {
+      this.cleanupSkippedSongs();
+    }
     this.queue.splice(this.currentIndex + 1, 0, ...songs);
     if (!this.shuffled) {
       this.originalQueue.splice(this.currentIndex + 1, 0, ...songs);
@@ -51,66 +57,42 @@ export class QueueService {
   }
 
   private cleanupSkippedSongs() {
-    const playedSongs: Models.Song[] = [];
-    const playedOriginalIndices: number[] = [];
+    // Collect only played songs
+    const playedSongs = this.queue
+      .slice(0, this.currentIndex + 1)
+      .filter((_, i) => this.playedIndices.has(i));
 
-    for (let i = 0; i <= this.currentIndex; i++) {
-      if (this.playedIndices.has(i)) {
-        playedSongs.push(this.queue[i]);
-        playedOriginalIndices.push(i);
-      }
-    }
-
-    const remainingAfterCurrent = this.queue.slice(this.currentIndex + 1);
-
-    this.queue = [...playedSongs, ...remainingAfterCurrent];
+    // Combine with remaining songs after current
+    this.queue = [...playedSongs, ...this.queue.slice(this.currentIndex + 1)];
     this.currentIndex = playedSongs.length - 1;
 
+    // Reset played indices (all songs up to current are now "played")
     this.playedIndices.clear();
-    for (let i = 0; i < playedSongs.length; i++) {
+    for (let i = 0; i <= this.currentIndex; i++) {
       this.playedIndices.add(i);
     }
 
+    // Sync original queue if not shuffled
     if (!this.shuffled) {
-      this.originalQueue = [...this.queue];
+      this.originalQueue = this.queue;
     }
   }
 
-  /**
-   * Enforces an upper bound on the in-memory playback queue size while preserving
-   * the currently playing song and a minimum number of upcoming songs.
-   *
-   * This method may remove older songs that appear before the current index when
-   * the queue grows beyond {@link maxSize}. It ensures that at least a fixed
-   * minimum number of songs (defined internally) remain after the current song.
-   * When truncation occurs, it:
-   * - Slices {@link this.queue} to drop excess songs before the current song.
-   * - Keeps {@link this.originalQueue} in sync when the queue is not shuffled.
-   * - Adjusts {@link this.currentIndex} so it continues to point to the same
-   *   logical song within the truncated queue.
-   *
-   * @param maxSize - Maximum allowed number of songs to keep in the queue.
-   */
-  private truncateQueue(maxSize: number = 20) {
-    if (this.queue.length <= maxSize) return;
+  private truncateQueue() {
+    if (this.currentIndex <= this.maxPrevious) return;
 
-    const minAfterCurrent = 10;
-    const songsAfterCurrent = this.queue.length - this.currentIndex - 1;
+    const startIndex = this.currentIndex - this.maxPrevious;
+    this.queue = this.queue.slice(startIndex);
+    this.currentIndex = this.maxPrevious;
 
-    if (songsAfterCurrent >= minAfterCurrent) {
-      const maxAllowedBefore = maxSize - minAfterCurrent - 1;
-      const songsBeforeCurrent = this.currentIndex;
+    const newPlayed = new Set<number>();
+    for (let i = 0; i <= this.currentIndex; i++) {
+      newPlayed.add(i);
+    }
+    this.playedIndices = newPlayed;
 
-      if (songsBeforeCurrent > maxAllowedBefore) {
-        const startIndex = songsBeforeCurrent - maxAllowedBefore;
-        this.queue = this.queue.slice(startIndex);
-
-        if (!this.shuffled) {
-          this.originalQueue = [...this.queue];
-        }
-
-        this.currentIndex = this.currentIndex - startIndex;
-      }
+    if (!this.shuffled) {
+      this.originalQueue = this.queue;
     }
   }
 
@@ -143,11 +125,41 @@ export class QueueService {
     return this.currentIndex;
   }
 
-  getUpNext(limit: number = 5): Models.Song[] {
+  getUpNext(limit?: number): Models.Song[] {
+    const requested = limit ?? this.maxAfter;
+    const boundedLimit = Math.max(
+      this.minAfter,
+      Math.min(requested, this.maxAfter),
+    );
     return this.queue.slice(
       this.currentIndex + 1,
-      this.currentIndex + limit + 1,
+      this.currentIndex + boundedLimit + 1,
     );
+  }
+
+  getWindowedQueue(): { queue: Models.Song[]; currentIndex: number } {
+    if (this.currentIndex < 0 || this.queue.length === 0) {
+      return { queue: [], currentIndex: -1 };
+    }
+
+    const start = Math.max(0, this.currentIndex - this.maxPrevious);
+    const availableAfter = Math.max(
+      0,
+      this.queue.length - this.currentIndex - 1,
+    );
+    const desiredAfter = Math.max(
+      this.minAfter,
+      Math.min(availableAfter, this.maxAfter),
+    );
+    const end = Math.min(
+      this.queue.length,
+      this.currentIndex + 1 + desiredAfter,
+    );
+
+    return {
+      queue: this.queue.slice(start, end),
+      currentIndex: this.currentIndex - start,
+    };
   }
 
   next(): Models.Song | null {
@@ -158,6 +170,7 @@ export class QueueService {
     if (this.currentIndex < this.queue.length - 1) {
       this.currentIndex++;
       this.playedIndices.add(this.currentIndex);
+      this.truncateQueue();
     } else if (this.repeatMode === "all" && this.queue.length > 0) {
       this.currentIndex = 0;
       this.playedIndices.add(this.currentIndex);
@@ -176,6 +189,7 @@ export class QueueService {
     if (this.currentIndex > 0) {
       this.currentIndex--;
       this.playedIndices.add(this.currentIndex);
+      this.truncateQueue();
     } else if (this.repeatMode === "all" && this.queue.length > 0) {
       this.currentIndex = this.queue.length - 1;
       this.playedIndices.add(this.currentIndex);
@@ -190,6 +204,7 @@ export class QueueService {
     if (index < 0 || index >= this.queue.length) return null;
     this.currentIndex = index;
     this.playedIndices.add(index);
+    this.truncateQueue();
     return this.getCurrentSong();
   }
 
@@ -205,18 +220,20 @@ export class QueueService {
       this.shuffled = false;
     } else {
       const currentSong = this.getCurrentSong();
-      const remaining = this.queue.filter((_, i) => i !== this.currentIndex);
-
-      for (let i = remaining.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
-      }
-
       if (currentSong) {
-        this.queue = [currentSong, ...remaining];
+        // Move current song to front
+        const currentQueue = this.queue.slice();
+        currentQueue.splice(this.currentIndex, 1);
+        // Fisher-Yates shuffle for remaining songs
+        for (let i = currentQueue.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [currentQueue[i], currentQueue[j]] = [
+            currentQueue[j],
+            currentQueue[i],
+          ];
+        }
+        this.queue = [currentSong, ...currentQueue];
         this.currentIndex = 0;
-      } else {
-        this.queue = remaining;
       }
       this.shuffled = true;
     }

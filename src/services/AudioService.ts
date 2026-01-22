@@ -17,8 +17,14 @@ export class AudioService {
 
     try {
       await setAudioModeAsync({
+        // Keep playback alive while app is backgrounded/locked
         playsInSilentMode: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: false,
         shouldRouteThroughEarpiece: false,
+        playThroughEarpieceAndroid: false,
+        interruptionModeAndroid: "doNotMix",
+        interruptionModeIOS: "doNotMix",
       });
       this.audioModeConfigured = true;
     } catch (error) {
@@ -35,6 +41,8 @@ export class AudioService {
     if (!player || this.isReleased) return;
 
     try {
+      await this.configureAudioMode();
+
       const id = songId || url.split("/").pop() || url;
 
       if (this.currentSource !== url) {
@@ -59,6 +67,7 @@ export class AudioService {
     const player = this.player;
     if (!player || this.isReleased) return;
     try {
+      await this.configureAudioMode();
       await player.play();
     } catch (error) {
       console.error("Error playing audio:", error);

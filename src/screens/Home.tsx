@@ -1,6 +1,12 @@
-import React, { useEffect, useState } from "react";
-import { useRouter } from "expo-router";
+import AlbumItem from "@/components/items/AlbumItem";
+import PlaylistItem from "@/components/items/PlaylistItem";
+import TrackItem from "@/components/items/TrackItem";
+import { usePlayer } from "@/contexts/PlayerContext";
+import { getScreenPaddingBottom } from "@/utils/designSystem";
+import { Album, Models, Playlist, Song } from "@saavn-labs/sdk";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -13,11 +19,7 @@ import {
   View,
 } from "react-native";
 import { Chip, IconButton, Text } from "react-native-paper";
-import { Album, Models, Playlist, Song } from "@saavn-labs/sdk";
-import AlbumItem from "@/components/items/AlbumItem";
-import PlaylistItem from "@/components/items/PlaylistItem";
-import TrackItem from "@/components/items/TrackItem";
-import { usePlayer } from "@/contexts/PlayerContext";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface HomeScreenProps {
   onAlbumPress: (albumId: string) => void;
@@ -46,6 +48,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const languages = ["hindi", "english", "punjabi", "tamil", "telugu"];
   const { width } = Dimensions.get("window");
+  const insets = useSafeAreaInsets();
+  const bottomPadding = getScreenPaddingBottom(true, true) + insets.bottom;
 
   useEffect(() => {
     setGreeting(getGreeting());
@@ -65,11 +69,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const loadHomeData = async () => {
     try {
       setLoading(true);
+
       const [trendingAlbums, trendingPlaylists, trendingSongs] =
         await Promise.all([
-          Album.getTrending({ language: selectedLanguage }).catch(() => []),
-          Playlist.getTrending({ language: selectedLanguage }).catch(() => []),
-          Song.getTrending({ language: selectedLanguage }).catch(() => []),
+          Album.getTrending({ language: selectedLanguage }),
+          Playlist.getTrending({ language: selectedLanguage }),
+          Song.getTrending({ language: selectedLanguage }),
         ]);
 
       const mockRecentlyPlayed = [
@@ -159,7 +164,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     if (section.type === "songs") {
       return (
         <View>
-          {section.data.slice(0, 5).map((track, index) => (
+          {section.data.slice(0, 5).map((track) => (
             <TrackItem
               key={track.id}
               track={track}
@@ -178,7 +183,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const renderRecentlyPlayedGrid = () => {
     if (recentlyPlayed.length === 0) return null;
 
-    const itemWidth = (width - 32 - 12) / 2; // Spotify-style 2-column chips
+    const itemWidth = (width - 32 - 12) / 2;
 
     return (
       <View style={styles.recentlyPlayedGrid}>
@@ -262,7 +267,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: bottomPadding },
+          ]}
         >
           {loading ? (
             <View style={styles.loadingContainer}>
@@ -312,8 +320,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               ))}
             </>
           )}
-
-          <View style={styles.bottomPadding} />
         </ScrollView>
       </View>
     </View>
@@ -333,7 +339,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#121212",
   },
   scrollContent: {
-    paddingBottom: 20,
     flexGrow: 1,
   },
   headerGradient: {
@@ -451,7 +456,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   bottomPadding: {
-    height: 120,
     backgroundColor: "transparent",
   },
 });

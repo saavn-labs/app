@@ -1,6 +1,7 @@
 import TrackItem from "@/components/items/TrackItem";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { HistoryEntry, historyService } from "@/services/HistoryService";
+import { getScreenPaddingBottom } from "@/utils/designSystem";
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
@@ -14,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { Text, useTheme } from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const AnimatedSectionList = Animated.createAnimatedComponent(
   SectionList<HistoryEntry, HistorySection>,
@@ -26,62 +28,37 @@ interface HistorySection {
 
 export default function HistoryScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const bottomPadding = getScreenPaddingBottom(true, true) + insets.bottom;
   const [sections, setSections] = useState<HistorySection[]>([]);
   const [loading, setLoading] = useState(true);
   const { playSong, currentSong } = usePlayer();
 
   const scrollY = useRef(new Animated.Value(0)).current;
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [0, 1],
-    extrapolate: "clamp",
-  });
 
   useEffect(() => {
     loadHistory();
   }, []);
 
   const groupHistoryByDate = (history: HistoryEntry[]): HistorySection[] => {
-    const grouped: { [key: string]: HistoryEntry[] } = {};
+    // Only keep entries from today
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const lastWeek = new Date(today);
-    lastWeek.setDate(lastWeek.getDate() - 7);
 
-    history.forEach((entry) => {
+    const todaysEntries = history.filter((entry) => {
       const playedAt = new Date(entry.playedAt);
       playedAt.setHours(0, 0, 0, 0);
-
-      let dateKey: string;
-      if (playedAt.getTime() === today.getTime()) {
-        dateKey = "Today";
-      } else if (playedAt.getTime() === yesterday.getTime()) {
-        dateKey = "Yesterday";
-      } else if (playedAt.getTime() >= lastWeek.getTime()) {
-        dateKey = playedAt.toLocaleString("en-US", { weekday: "long" });
-      } else {
-        const day = playedAt.getDate();
-        const month = playedAt.toLocaleString("en-US", { month: "short" });
-        dateKey = `${day} ${month}`;
-      }
-
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = [];
-      }
-      grouped[dateKey].push(entry);
+      return playedAt.getTime() === today.getTime();
     });
 
-    const sections: HistorySection[] = [];
-    Object.keys(grouped).forEach((key) => {
-      sections.push({
-        title: key,
-        data: grouped[key],
-      });
-    });
+    if (todaysEntries.length === 0) return [];
 
-    return sections;
+    return [
+      {
+        title: "Today",
+        data: todaysEntries,
+      },
+    ];
   };
 
   const loadHistory = async () => {
@@ -185,24 +162,30 @@ export default function HistoryScreen() {
     );
   };
 
-  const renderSectionHeader = ({ section }: { section: HistorySection }) => (
-    <View
-      style={[
-        styles.sectionHeader,
-        { backgroundColor: theme.colors.background },
-      ]}
-    >
-      <Text variant="titleLarge" style={styles.sectionTitle}>
-        {section.title}
-      </Text>
-      <Text
-        variant="bodySmall"
-        style={[styles.sectionCount, { color: theme.colors.onSurfaceVariant }]}
+  const renderSectionHeader = ({ section }: { section: HistorySection }) => {
+    if (section.title === "Today") return null;
+    return (
+      <View
+        style={[
+          styles.sectionHeader,
+          { backgroundColor: theme.colors.background },
+        ]}
       >
-        {section.data.length} song{section.data.length !== 1 ? "s" : ""}
-      </Text>
-    </View>
-  );
+        <Text variant="titleLarge" style={styles.sectionTitle}>
+          {section.title}
+        </Text>
+        <Text
+          variant="bodySmall"
+          style={[
+            styles.sectionCount,
+            { color: theme.colors.onSurfaceVariant },
+          ]}
+        >
+          {section.data.length} song{section.data.length !== 1 ? "s" : ""}
+        </Text>
+      </View>
+    );
+  };
 
   const totalTracks = sections.reduce(
     (sum, section) => sum + section.data.length,
@@ -280,8 +263,11 @@ export default function HistoryScreen() {
               colors={[theme.colors.primary]}
             />
           }
-          contentContainerStyle={styles.listContent}
-          stickySectionHeadersEnabled={true}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: bottomPadding },
+          ]}
+          stickySectionHeadersEnabled={false}
           showsVerticalScrollIndicator={false}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -298,8 +284,8 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#121212",
   },
-
   fixedHeader: {
     position: "absolute",
     top: 0,
@@ -351,7 +337,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    paddingBottom: 120,
+    paddingBottom: 0,
   },
 
   sectionHeader: {

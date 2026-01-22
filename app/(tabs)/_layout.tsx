@@ -1,101 +1,92 @@
+import CompactPlayer from "@/components/player/CompactPlayer";
+import FullPlayer from "@/components/player/FullPlayer";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-const TAB_BAR_HEIGHT = 60;
+import { sizes } from "@/utils";
 
 export default function TabLayout() {
-  const insets = useSafeAreaInsets();
+  const [isFullPlayerVisible, setFullPlayerVisible] = useState(false);
 
   return (
     <View style={styles.root}>
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarShowLabel: true,
+          tabBarShowLabel: false,
           tabBarStyle: {
-            position: "absolute",
-            backgroundColor: "rgba(18, 18, 18, 0.95)",
-            height: TAB_BAR_HEIGHT + insets.bottom,
+            backgroundColor: "#121212",
+            height: sizes.tabBarHeight,
+            paddingBottom: 0,
             borderTopWidth: 0,
-            paddingTop: 8,
-            paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
-            paddingHorizontal: 0,
             elevation: 0,
-            shadowOpacity: 0,
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
           },
           tabBarActiveTintColor: "#ffffff",
           tabBarInactiveTintColor: "#b3b3b3",
           tabBarItemStyle: {
-            paddingTop: 4,
-            paddingBottom: 4,
-          },
-          tabBarLabelStyle: {
-            fontSize: 11,
-            fontWeight: "600",
-            marginTop: 4,
-            letterSpacing: 0.2,
-          },
-          tabBarIconStyle: {
-            marginBottom: 0,
+            paddingVertical: 8,
           },
         }}
       >
         <Tabs.Screen
           name="index"
           options={{
-            title: "",
             tabBarIcon: ({ color, focused }) => (
               <MaterialCommunityIcons
                 name={focused ? "home-variant" : "home-variant-outline"}
                 color={color}
-                size={28}
+                size={30}
               />
             ),
           }}
         />
+
         <Tabs.Screen
           name="search"
           options={{
-            title: "",
-            tabBarIcon: ({ color, focused }) => (
-              <MaterialCommunityIcons
-                name={focused ? "magnify" : "magnify"}
-                color={color}
-                size={28}
-              />
+            tabBarIcon: ({ color }) => (
+              <MaterialCommunityIcons name="magnify" color={color} size={30} />
             ),
           }}
         />
+
         <Tabs.Screen
           name="library"
           options={{
-            title: "",
-            tabBarIcon: ({ color, focused }) => (
+            tabBarIcon: ({ color }) => (
               <MaterialCommunityIcons
-                name={focused ? "bookshelf" : "bookshelf"}
+                name="bookshelf"
                 color={color}
-                size={28}
+                size={30}
               />
             ),
           }}
         />
+
         <Tabs.Screen
           name="history"
           options={{
-            title: "",
-            tabBarIcon: ({ color, focused }) => (
-              <MaterialCommunityIcons
-                name={focused ? "history" : "history"}
-                color={color}
-                size={28}
-              />
+            tabBarIcon: ({ color }) => (
+              <MaterialCommunityIcons name="history" color={color} size={30} />
             ),
           }}
         />
       </Tabs>
+
+      <CompactPlayer
+        onPress={() => setFullPlayerVisible(true)}
+        style={styles.compactPlayerOffset}
+      />
+
+      <FullPlayer
+        visible={isFullPlayerVisible}
+        onClose={() => setFullPlayerVisible(false)}
+      />
     </View>
   );
 }
@@ -104,5 +95,12 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: "#121212",
+  },
+  compactPlayerOffset: {
+    position: "absolute",
+    bottom: sizes.tabBarHeight + 8,
+    left: 8,
+    right: 8,
+    zIndex: 10,
   },
 });

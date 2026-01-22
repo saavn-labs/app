@@ -60,6 +60,10 @@ export class PlayerService {
     this.listeners.forEach((listener) => listener(this.state));
   }
 
+  private getWindowedQueueState() {
+    return this.queueService.getWindowedQueue();
+  }
+
   private updateState(updates: Partial<PlayerState>) {
     this.state = { ...this.state, ...updates };
     this.notifyListeners();
@@ -77,12 +81,26 @@ export class PlayerService {
           const duration = this.audioService.getDuration();
 
           const progressChanged =
-            Math.abs(this.state.progress - progress) > 0.5;
+            Math.abs(this.state.progress - progress) > 0.2;
           const durationChanged =
-            Math.abs(this.state.duration - duration) > 0.1;
+            Math.abs(this.state.duration - duration) > 0.2;
 
           if (progressChanged || durationChanged) {
             this.updateState({ progress, duration });
+
+            // Update media session only when duration changes or periodically
+            if (this.state.currentSong && durationChanged) {
+              mediaSessionService.updateNowPlaying(
+                this.state.currentSong,
+                "",
+                true,
+                progress,
+                duration,
+              );
+            } else if (this.state.currentSong) {
+              // Only update playback state (position) without full metadata
+              mediaSessionService.updatePlaybackState(true, progress);
+            }
           }
 
           if (this.state.currentSong && progressChanged) {
@@ -92,17 +110,7 @@ export class PlayerService {
             );
           }
 
-          if (this.state.currentSong) {
-            mediaSessionService.updateNowPlaying(
-              this.state.currentSong,
-              "",
-              true,
-              progress,
-              duration,
-            );
-          }
-
-          if (duration > 0 && progress >= duration - 0.5) {
+          if (duration > 0 && progress >= duration - 0.3) {
             this.playNext();
           }
         }
@@ -110,7 +118,7 @@ export class PlayerService {
         console.error("Error in progress tracking:", error);
         this.stopProgressTracking();
       }
-    }, 500) as number;
+    }, 250) as number;
   }
 
   private stopProgressTracking() {
@@ -151,20 +159,20 @@ export class PlayerService {
   }
 
   private async loadAndPlaySong(song: Models.Song) {
-    let encryptedUrl = song.media?.encryptedUrl;
-
-    if (!song.media?.encryptedUrl) {
-      const songDetail = await Song.getById({ songIds: song.id });
-      encryptedUrl = songDetail.songs[0]?.media?.encryptedUrl;
-    }
+    const encryptedUrl =
+      song.media?.encryptedUrl ||
+      (await Song.getById({ songIds: song.id })).songs[0]?.media?.encryptedUrl;
 
     if (!encryptedUrl) {
       throw new Error("No encrypted URL found for the song");
     }
 
-    const streamUrl = await Song.experimental
-      .fetchStreamUrls(encryptedUrl, "edge", true)
-      .then((urls) => urls[2].url);
+    const urls = await Song.experimental.fetchStreamUrls(
+      encryptedUrl,
+      "edge",
+      true,
+    );
+    const streamUrl = urls[2]?.url || urls[1]?.url || urls[0]?.url;
 
     if (!streamUrl) {
       throw new Error("No streaming URL available");
@@ -184,18 +192,14 @@ export class PlayerService {
     this.updateState({
       status: "playing",
       currentSong: song,
-      currentIndex: this.queueService.getCurrentIndex(),
-      queue: this.queueService.getQueue(),
+      ...this.getWindowedQueueState(),
       progress: 0,
       duration: this.audioService.getDuration(),
     });
 
+    historyService.addToHistory(song, duration);
+    playerStateService.savePlayerState(song, 0);
     this.startProgressTracking();
-
-    setTimeout(() => {
-      historyService.addToHistory(song, duration);
-      playerStateService.savePlayerState(song, 0);
-    }, 1000);
   }
 
   private handlePlayError(error: unknown) {
@@ -208,7 +212,7 @@ export class PlayerService {
     });
   }
 
-  getUpNext(limit: number = 5): Models.Song[] {
+  getUpNext(limit: number = 9): Models.Song[] {
     return this.queueService.getUpNext(limit);
   }
 
@@ -219,14 +223,6 @@ export class PlayerService {
         await mediaSessionService.updatePlaybackState(
           true,
           this.state.progress,
-        );
-
-        await mediaSessionService.updateNowPlaying(
-          this.state.currentSong,
-          "",
-          true,
-          this.state.progress,
-          this.state.duration,
         );
 
         this.updateState({ status: "playing" });
@@ -249,16 +245,6 @@ export class PlayerService {
       await this.audioService.pause();
       await mediaSessionService.updatePlaybackState(false, this.state.progress);
 
-      if (this.state.currentSong) {
-        await mediaSessionService.updateNowPlaying(
-          this.state.currentSong,
-          "",
-          false,
-          this.state.progress,
-          this.state.duration,
-        );
-      }
-
       this.updateState({ status: "paused" });
       this.stopProgressTracking();
 
@@ -280,6 +266,16 @@ export class PlayerService {
   }
 
   async playNext() {
+    // If looping current song, just restart it instead of advancing
+    if (this.state.repeatMode === "one") {
+      await this.seekTo(0);
+      if (!this.audioService.isPlaying()) {
+        await this.audioService.play();
+      }
+      await mediaSessionService.updatePlaybackState(true, 0);
+      return;
+    }
+
     const isLastOrOnlySong =
       this.queueService.getCurrentIndex() >=
       this.queueService.getQueue().length - 1;
@@ -294,8 +290,7 @@ export class PlayerService {
         if (recommendations.length > 0) {
           this.queueService.appendQueue(recommendations);
           this.updateState({
-            queue: this.queueService.getQueue(),
-            currentIndex: this.queueService.getCurrentIndex(),
+            ...this.getWindowedQueueState(),
           });
         }
       } catch (error) {
@@ -349,9 +344,25 @@ export class PlayerService {
     this.queueService.toggleShuffle();
     this.updateState({
       isShuffled: this.queueService.isShuffled(),
-      queue: this.queueService.getQueue(),
-      currentIndex: this.queueService.getCurrentIndex(),
+      ...this.getWindowedQueueState(),
     });
+  }
+
+  async ensureBackgroundPlayback() {
+    try {
+      if (this.state.status !== "playing") return;
+
+      // If OS paused us while backgrounded, resume politely
+      if (!this.audioService.isPlaying()) {
+        await this.audioService.play();
+        await mediaSessionService.updatePlaybackState(
+          true,
+          this.state.progress,
+        );
+      }
+    } catch (error) {
+      console.error("Error ensuring background playback:", error);
+    }
   }
 
   cycleRepeatMode() {
@@ -361,12 +372,12 @@ export class PlayerService {
 
   addToQueue(song: Models.Song) {
     this.queueService.addToQueue(song);
-    this.updateState({ queue: this.queueService.getQueue() });
+    this.updateState({ ...this.getWindowedQueueState() });
   }
 
   addNextInQueue(song: Models.Song) {
     this.queueService.addNextInQueue(song);
-    this.updateState({ queue: this.queueService.getQueue() });
+    this.updateState({ ...this.getWindowedQueueState() });
   }
 
   getState(): PlayerState {

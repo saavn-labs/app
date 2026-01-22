@@ -17,7 +17,7 @@ export const borderRadius = {
 
 export const sizes = {
   tabBarHeight: 60,
-  compactPlayerHeight: 80,
+  compactPlayerHeight: 74,
 };
 
 export const getScreenPaddingBottom = (

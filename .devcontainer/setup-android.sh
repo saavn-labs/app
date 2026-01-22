@@ -11,8 +11,8 @@ cd $ANDROID_SDK_ROOT
 
 # Update packages and install dependencies
 # Added openjdk-17-jdk: Required for Expo SDK 52+ / React Native 0.74+ and modern sdkmanager
-sudo apt update
-sudo apt install -y unzip wget lib32stdc++6 lib32z1 openjdk-17-jdk
+sudo dnf update
+sudo dnf install -y unzip wget lib32stdc++6 lib32z1 openjdk-17-jdk
 
 # Download latest Android Command Line Tools (Version 14.0 / build 12700392)
 wget https://dl.google.com/android/repository/commandlinetools-linux-12700392_latest.zip
@@ -32,11 +32,11 @@ if [ -d "cmdline-tools/bin" ]; then
 fi
 
 # Set Environment Variables
-echo "export ANDROID_HOME=$ANDROID_HOME" >> ~/.bashrc
-echo "export ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> ~/.bashrc
+echo "export ANDROID_HOME=$ANDROID_HOME" >> ~/.zshrc
+echo "export ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> ~/.zshrc
 # Add Java Home if needed (usually auto-detected, but good practice)
-echo "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> ~/.bashrc
-echo 'export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools' >> ~/.bashrc
+echo "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> ~/.zshrc
+echo 'export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools' >> ~/.zshrc
 
 # Reload bashrc to apply paths immediately for the script execution
 export ANDROID_HOME=$ANDROID_HOME

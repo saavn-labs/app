@@ -13,7 +13,26 @@ export class HistoryService {
   async getHistory(): Promise<HistoryEntry[]> {
     try {
       const data = await AsyncStorage.getItem(HISTORY_KEY);
-      return data ? JSON.parse(data) : [];
+      const parsed: HistoryEntry[] = data ? JSON.parse(data) : [];
+
+      // Deduplicate by song id, keeping the latest entry
+      // Assumes newest entries are earlier in the array
+      const seen = new Set<string>();
+      const deduped: HistoryEntry[] = [];
+      for (const entry of parsed) {
+        const id = entry.song.id;
+        if (!seen.has(id)) {
+          seen.add(id);
+          deduped.push(entry);
+        }
+      }
+
+      // If we removed any duplicates, persist the cleaned history
+      if (deduped.length !== parsed.length) {
+        await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(deduped));
+      }
+
+      return deduped;
     } catch (error) {
       console.error("Error getting history:", error);
       return [];
@@ -46,9 +65,12 @@ export class HistoryService {
           duration,
         };
 
+        // Remove any older occurrences of this song to avoid duplicates
+        const filtered = history.filter((h) => h.song.id !== song.id);
+
         // Add to beginning and limit to 500 entries
-        history.unshift(entry);
-        const limited = history.slice(0, 500);
+        filtered.unshift(entry);
+        const limited = filtered.slice(0, 500);
         await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(limited));
         return;
       }

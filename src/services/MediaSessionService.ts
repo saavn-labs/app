@@ -63,6 +63,8 @@ export class MediaSessionService {
   private commandHandlers: RemoteCommandHandlers = {};
   private unsubscribe: (() => void) | null = null;
   private currentMetadata: MediaMetadata | null = null;
+  private lastMetadataUpdate: number = 0;
+  private readonly METADATA_UPDATE_THROTTLE = 1000; // Only update metadata once per second
 
   async initialize(handlers?: RemoteCommandHandlers) {
     try {
@@ -87,7 +89,7 @@ export class MediaSessionService {
         notification: {
           color: "#1DB954",
           showWhenClosed: true,
-          ongoing: false,
+          ongoing: true,
         },
         android: {
           skipInterval: 15,
@@ -173,19 +175,34 @@ export class MediaSessionService {
         await this.initialize();
       }
 
+      const now = Date.now();
+      const timeSinceLastUpdate = now - this.lastMetadataUpdate;
+
+      // Check if metadata actually changed
+      const metadataChanged =
+        !this.currentMetadata ||
+        this.currentMetadata.title !== song.title ||
+        Math.abs(this.currentMetadata.duration - duration) > 1;
+
+      // Only update if metadata changed or enough time passed
+      if (
+        !metadataChanged &&
+        timeSinceLastUpdate < this.METADATA_UPDATE_THROTTLE
+      ) {
+        // Skip update completely if nothing changed - don't even update playback state
+        return;
+      }
+
       const artistNames =
         song.artists?.primary?.map((a) => a.name).join(", ") ||
         "Unknown Artist";
-
       const albumName =
         typeof song.album === "string" ? song.album : song.album?.title || "";
-
       const subtitle = song.subtitle
         ? song.subtitle
         : albumName
           ? `${artistNames} • ${albumName}`
           : artistNames;
-
       const artwork = song.images?.[2]?.url || song.images?.[0]?.url || "";
 
       this.currentMetadata = {
@@ -197,21 +214,36 @@ export class MediaSessionService {
         duration,
       };
 
-      await MediaControl.updateMetadata({
-        title: song.title || "Unknown",
-        artist: artistNames,
-        album: albumName || "Unknown Album",
-        subtitle,
-        artwork: artwork
-          ? {
-              uri: artwork,
-            }
-          : undefined,
-        duration,
-      });
+      // Only log if metadata actually changed
+      if (metadataChanged) {
+        console.log("📱 Updating media metadata:", {
+          title: song.title,
+          duration,
+        });
+      }
 
-      const state = isPlaying ? PlaybackState.PLAYING : PlaybackState.PAUSED;
-      await MediaControl.updatePlaybackState(state, position, 1.0);
+      // Batch both updates in parallel
+      await Promise.all([
+        MediaControl.updateMetadata({
+          title: song.title || "Unknown",
+          artist: artistNames,
+          album: albumName || "Unknown Album",
+          subtitle,
+          artwork: artwork
+            ? {
+                uri: artwork,
+              }
+            : undefined,
+          duration,
+        }),
+        MediaControl.updatePlaybackState(
+          isPlaying ? PlaybackState.PLAYING : PlaybackState.PAUSED,
+          position,
+          1.0,
+        ),
+      ]);
+
+      this.lastMetadataUpdate = now;
     } catch (error) {
       console.error("Error updating now playing:", error);
     }
