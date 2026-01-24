@@ -1,6 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import {
   Image,
   StyleSheet,
@@ -9,12 +10,19 @@ import {
   ViewStyle,
 } from "react-native";
 import { Text } from "react-native-paper";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { usePlayer } from "../../contexts/PlayerContext";
+import {
+  useCurrentSong,
+  useDominantColor,
+  useDuration,
+  usePlaybackStatus,
+  usePlayerActions,
+  useProgress,
+  useSetDominantColor,
+} from "../../stores/playerStore";
 import {
   createColorGradient,
-  extractDominantColor,
+  extractAndUpdateColor,
 } from "../../utils/colorUtils";
 
 interface CompactPlayerProps {
@@ -22,12 +30,14 @@ interface CompactPlayerProps {
   style?: ViewStyle;
 }
 
-const DEFAULT_COLOR = "#1a1a1a";
-
 const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
-  const { currentSong, status, progress, duration, togglePlayPause, playNext } =
-    usePlayer();
-  const [dominantColor, setDominantColor] = useState(DEFAULT_COLOR);
+  const currentSong = useCurrentSong();
+  const status = usePlaybackStatus();
+  const progress = useProgress();
+  const duration = useDuration();
+  const { togglePlayPause, playNext } = usePlayerActions();
+  const dominantColor = useDominantColor();
+  const setDominantColor = useSetDominantColor();
   const insets = useSafeAreaInsets();
 
   let tabBarHeight = 0;
@@ -39,11 +49,9 @@ const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
 
   useEffect(() => {
     if (currentSong?.images?.[0]?.url) {
-      extractDominantColor(currentSong.images[0].url).then(({ color }) => {
-        setDominantColor(color);
-      });
+      extractAndUpdateColor(currentSong.images[0].url, setDominantColor);
     }
-  }, [currentSong?.id]);
+  }, [currentSong?.id, setDominantColor]);
 
   if (!currentSong) return null;
 
@@ -65,7 +73,6 @@ const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
-        {/* Progress Bar */}
         <View style={styles.progressBarContainer}>
           <View
             style={[
@@ -81,7 +88,6 @@ const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
           activeOpacity={0.9}
         >
           <View style={styles.leftContent}>
-            {/* Artwork with shadow */}
             <View style={styles.artworkContainer}>
               <Image
                 source={{
@@ -94,7 +100,6 @@ const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
               />
             </View>
 
-            {/* Track Info */}
             <View style={styles.textContainer}>
               <Text variant="bodyMedium" numberOfLines={1} style={styles.title}>
                 {currentSong.title}
@@ -109,10 +114,12 @@ const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
             </View>
           </View>
 
-          {/* Controls */}
           <View style={styles.controls}>
             <TouchableOpacity
-              onPress={togglePlayPause}
+              onPress={(e) => {
+                e.stopPropagation();
+                togglePlayPause();
+              }}
               style={styles.playButton}
               activeOpacity={0.8}
             >

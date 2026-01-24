@@ -1,21 +1,17 @@
-/**
- *  Player Service
- * - Performance improvements with throttling
- * - Better error handling
- * - Centralized constants
- */
-
 import { PlayerStatus, RepeatMode } from "@/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Models, Song } from "@saavn-labs/sdk";
-import { AUDIO_QUALITY, PLAYER_CONFIG, STORAGE_KEYS } from "../constants";
+import {
+  AudioPlayer,
+  setAudioModeAsync,
+  AudioStatus,
+  AudioMetadata,
+  AudioLockScreenOptions,
+} from "expo-audio";
+import type { EventSubscription } from "expo-modules-core";
+import { AUDIO_QUALITY, STORAGE_KEYS } from "../constants";
 import { throttle } from "../utils/asyncHelpers";
-import { handleAsync, logError } from "../utils/errorHandler";
-import { audioService, AudioService } from "./AudioService";
-import { historyService } from "./HistoryService";
-import { mediaSessionService } from "./MediaSessionService";
-import { playerStateService } from "./PlayerStateService";
-import { queueService, QueueService } from "./QueueService";
+import { queueService, type GetUpNextResult } from "./QueueService";
 
 export interface PlayerState {
   status: PlayerStatus;
@@ -29,421 +25,251 @@ export interface PlayerState {
   error: string | null;
 }
 
-type PlayerListener = (state: PlayerState) => void;
+interface SavedState {
+  currentSong: Models.Song | null;
+  seekPosition: number;
+  timestamp: string;
+}
+
+type StateUpdater = (updates: Partial<PlayerState>) => void;
 
 export class PlayerService {
-  private audioService: AudioService;
-  private queueService: QueueService;
-  private listeners: Set<PlayerListener> = new Set();
-  private progressInterval: ReturnType<typeof setInterval> | null = null;
-  private lastPlayNextTime: number = 0;
+  private player: AudioPlayer | null = null;
+  private currentUrl = "";
+  private audioModeReady = false;
+  private stateUpdater: StateUpdater | null = null;
+  private statusUnsubscribe: EventSubscription | null = null;
+  private lastSavePosition = 0;
 
-  private state: PlayerState = {
-    status: "idle",
-    currentSong: null,
-    currentIndex: -1,
-    queue: [],
-    progress: 0,
-    duration: 0,
-    isShuffled: false,
-    repeatMode: false,
-    error: null,
-  };
-
-  private throttledMetadataUpdate = throttle(
-    (
-      song: Models.Song,
-      url: string,
-      isPlaying: boolean,
-      progress: number,
-      duration: number,
-    ) => {
-      mediaSessionService.updateNowPlaying(
-        song,
-        url,
-        isPlaying,
-        progress,
-        duration,
-      );
-    },
-    PLAYER_CONFIG.METADATA_UPDATE_THROTTLE,
+  private readonly throttledSave = throttle(
+    (pos: number) => this.save(pos),
+    2000,
   );
 
-  private throttledStateUpdate = throttle(
-    (isPlaying: boolean, progress: number) => {
-      mediaSessionService.updatePlaybackState(isPlaying, progress);
-    },
-    500,
-  );
-
-  constructor(audioService: AudioService, queueService: QueueService) {
-    this.audioService = audioService;
-    this.queueService = queueService;
-    this.setupMediaSession();
+  setStateUpdater(updater: StateUpdater): void {
+    this.stateUpdater = updater;
   }
 
-  private setupMediaSession() {
-    mediaSessionService.initialize({
-      onPlay: async () => await this.play(),
-      onPause: async () => await this.pause(),
-      onPlayPause: async () => await this.togglePlayPause(),
-      onNext: async () => await this.playNext(),
-      onPrevious: async () => await this.playPrevious(),
-      onSeek: async (position) => await this.seekTo(position),
+  setAudioPlayer(player: AudioPlayer): void {
+    this.player = player;
+    this.setupStatusListener();
+  }
+
+  private async ensureAudio(): Promise<void> {
+    if (this.audioModeReady) return;
+
+    try {
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        shouldPlayInBackground: true,
+        shouldRouteThroughEarpiece: false,
+        interruptionMode: "doNotMix",
+      });
+      this.audioModeReady = true;
+    } catch (e) {
+      if (__DEV__) console.error("[Player] Audio mode failed:", e);
+    }
+  }
+
+  private setupStatusListener(): void {
+    if (!this.player) return;
+
+
+    this.statusUnsubscribe?.remove();
+
+
+    this.statusUnsubscribe = this.player.addListener(
+      "playbackStatusUpdate",
+      (status: AudioStatus) => {
+        this.handleStatusUpdate(status);
+      },
+    );
+  }
+
+  private handleStatusUpdate(status: AudioStatus): void {
+    const {
+      currentTime,
+      duration,
+      playing,
+      isLoaded,
+      isBuffering,
+      didJustFinish,
+    } = status;
+
+
+    this.notify({
+      progress: currentTime,
+      duration: duration || 0,
+      status: this.getPlayerStatus(playing, isLoaded, isBuffering),
     });
-  }
 
-  subscribe(listener: PlayerListener): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
 
-  private notifyListeners() {
-    this.listeners.forEach((listener) => listener(this.state));
-  }
-
-  private getWindowedQueueState() {
-    return this.queueService.getWindowedQueue();
-  }
-
-  private updateState(updates: Partial<PlayerState>) {
-    this.state = { ...this.state, ...updates };
-    this.notifyListeners();
-  }
-
-  private startProgressTracking() {
-    if (this.progressInterval) {
-      clearInterval(this.progressInterval);
+    if (playing && currentTime > 0) {
+      this.throttledSave(currentTime);
     }
 
-    this.progressInterval = setInterval(() => {
-      try {
-        if (this.audioService.isPlaying()) {
-          const progress = this.audioService.getCurrentTime();
-          const duration = this.audioService.getDuration();
 
-          const progressChanged =
-            Math.abs(this.state.progress - progress) > 0.2;
-          const durationChanged =
-            Math.abs(this.state.duration - duration) > 0.2;
-
-          if (progressChanged || durationChanged) {
-            this.updateState({ progress, duration });
-
-            if (this.state.currentSong) {
-              if (durationChanged) {
-                this.throttledMetadataUpdate(
-                  this.state.currentSong,
-                  "",
-                  true,
-                  progress,
-                  duration,
-                );
-              } else {
-                this.throttledStateUpdate(true, progress);
-              }
-            }
-          }
-
-          if (this.state.currentSong && progressChanged) {
-            playerStateService.savePlayerState(
-              this.state.currentSong,
-              progress,
-            );
-          }
-
-          if (
-            duration > 0 &&
-            progress >= duration - PLAYER_CONFIG.TRACK_END_THRESHOLD
-          ) {
-            const now = Date.now();
-            if (
-              now - this.lastPlayNextTime >
-              PLAYER_CONFIG.PLAY_NEXT_DEBOUNCE
-            ) {
-              this.lastPlayNextTime = now;
-              this.playNext();
-            }
-          }
-        }
-      } catch (error) {
-        logError("Progress tracking", error);
-        this.stopProgressTracking();
-      }
-    }, PLAYER_CONFIG.PROGRESS_UPDATE_INTERVAL) as unknown as number;
+    if (didJustFinish) {
+      void this.playNext();
+    }
   }
 
-  private stopProgressTracking() {
-    if (this.progressInterval) {
-      clearInterval(this.progressInterval);
-      this.progressInterval = null;
-    }
+  private getPlayerStatus(
+    playing: boolean,
+    isLoaded: boolean,
+    isBuffering: boolean,
+  ): PlayerStatus {
+    if (isBuffering) return "loading";
+    if (!isLoaded) return "idle";
+    return playing ? "playing" : "paused";
   }
 
   async playSong(
     song: Models.Song,
     queue?: Models.Song[],
     startIndex?: number,
-  ) {
+  ): Promise<void> {
     try {
-      if (!song.id) {
-        throw new Error("Cannot play song without ID");
+      if (!song.id) throw new Error("Invalid song ID");
+
+      this.notify({ status: "loading", error: null });
+
+      const result = await queueService.getUpNext({
+        type: "play",
+        song,
+        queue,
+        index: startIndex,
+      });
+
+      if (result.song) {
+        await this.loadAndPlay(result.song);
+        this.updateStateFromQueue(result);
+      }
+    } catch (e) {
+      this.handleError("playSong", e);
+    }
+  }
+
+  async play(): Promise<void> {
+    try {
+      if (!this.player) throw new Error("Player not initialized");
+
+      await this.ensureAudio();
+      this.player.play();
+      this.notify({ status: "playing" });
+    } catch (e) {
+      this.handleError("play", e);
+    }
+  }
+
+  async pause(): Promise<void> {
+    try {
+      if (!this.player) return;
+
+      this.player.pause();
+      this.notify({ status: "paused" });
+
+
+      await this.save(this.player.currentTime);
+    } catch (e) {
+      this.handleError("pause", e);
+    }
+  }
+
+  async togglePlayPause(): Promise<void> {
+    this.player?.playing ? await this.pause() : await this.play();
+  }
+
+  async playNext(): Promise<void> {
+    try {
+      const result = await queueService.getUpNext({
+        type: "next",
+      });
+
+      if (result.shouldRestart) {
+        await this.seekTo(0);
+        await this.play();
+        return;
       }
 
-      this.updateState({ status: "loading", error: null });
-
-      if (queue && queue.length > 0) {
-        const index = startIndex ?? queue.findIndex((s) => s.id === song.id);
-        this.queueService.setQueue(queue, index >= 0 ? index : 0);
+      if (result.song && result.shouldLoad) {
+        await this.loadAndPlay(result.song);
+        this.updateStateFromQueue(result);
       } else {
-        const playedSongs = this.queueService.getPlayedSongs();
-        const recommendations = await this.queueService.fetchRecommendations(
-          song.id,
-          true,
-        );
-        this.queueService.setQueue([song, ...recommendations], 0, playedSongs);
+        this.notify({ status: "idle" });
       }
-
-      await this.loadAndPlaySong(song);
-    } catch (error) {
-      this.handlePlayError(error);
+    } catch (e) {
+      this.handleError("playNext", e);
     }
   }
 
-  private async loadAndPlaySong(song: Models.Song) {
-    const encryptedUrl =
-      song.media?.encryptedUrl ||
-      (await Song.getById({ songIds: song.id })).songs[0]?.media?.encryptedUrl;
-
-    if (!encryptedUrl) {
-      throw new Error("No encrypted URL found for the song");
-    }
-
-    const urls = await Song.experimental.fetchStreamUrls(
-      encryptedUrl,
-      "edge",
-      true,
-    );
-
-    const quality =
-      (await AsyncStorage.getItem(STORAGE_KEYS.CONTENT_QUALITY)) || "medium";
-    const streamIndex =
-      AUDIO_QUALITY[quality.toUpperCase() as keyof typeof AUDIO_QUALITY] ||
-      AUDIO_QUALITY.MEDIUM;
-    const streamUrl = urls[streamIndex].url;
-
-    if (!streamUrl) {
-      throw new Error("No streaming URL available");
-    }
-
-    await this.audioService.loadAndPlayWithPreload(streamUrl);
-    const duration = this.audioService.getDuration();
-
-    await mediaSessionService.updateNowPlaying(
-      song,
-      streamUrl,
-      true,
-      0,
-      duration,
-    );
-
-    this.updateState({
-      status: "playing",
-      currentSong: song,
-      ...this.getWindowedQueueState(),
-      progress: 0,
-      duration: this.audioService.getDuration(),
-    });
-
-    historyService.addToHistory(song, duration);
-    playerStateService.savePlayerState(song, 0);
-    this.startProgressTracking();
-  }
-
-  private handlePlayError(error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Failed to play song";
-    logError("Play song", error);
-    this.updateState({
-      status: "error",
-      error: message,
-    });
-  }
-
-  getUpNext(limit: number = 9): Models.Song[] {
-    return this.queueService.getUpNext(limit);
-  }
-
-  async play() {
-    if (this.state.status === "paused" || this.state.status === "idle") {
-      if (this.state.currentSong) {
-        await this.audioService.play();
-        await mediaSessionService.updatePlaybackState(
-          true,
-          this.state.progress,
-        );
-
-        this.updateState({ status: "playing" });
-        this.startProgressTracking();
-      } else if (this.queueService.getQueue().length > 0) {
-        const song = this.queueService.getCurrentSong();
-        if (song) {
-          await this.playSong(
-            song,
-            this.queueService.getQueue(),
-            this.queueService.getCurrentIndex(),
-          );
-        }
-      }
-    }
-  }
-
-  async pause() {
-    if (this.state.status === "playing") {
-      await this.audioService.pause();
-      await mediaSessionService.updatePlaybackState(false, this.state.progress);
-
-      this.updateState({ status: "paused" });
-      this.stopProgressTracking();
-
-      if (this.state.currentSong) {
-        await playerStateService.savePlayerState(
-          this.state.currentSong,
-          this.state.progress,
-        );
-      }
-    }
-  }
-
-  async togglePlayPause() {
-    if (this.state.status === "playing") {
-      await this.pause();
-    } else {
-      await this.play();
-    }
-  }
-
-  async playNext() {
-    if (this.state.repeatMode) {
-      await this.seekTo(0);
-      await this.audioService.play();
-      await mediaSessionService.updatePlaybackState(true, 0);
-      return;
-    }
-
-    const isLastOrOnlySong =
-      this.queueService.getCurrentIndex() >=
-      this.queueService.getQueue().length - 1;
-
-    if (isLastOrOnlySong && this.state.currentSong) {
-      const result = await handleAsync(
-        () =>
-          this.queueService.fetchRecommendations(
-            this.state.currentSong!.id,
-            true,
-          ),
-        "Failed to fetch recommendations",
-      );
-
-      if (result.success && result.data && result.data.length > 0) {
-        this.queueService.appendQueue(result.data);
-        this.updateState({
-          ...this.getWindowedQueueState(),
-        });
-      }
-    }
-
-    const nextSong = this.queueService.next();
-    if (nextSong) {
-      await this.playSong(
-        nextSong,
-        this.queueService.getQueue(),
-        this.queueService.getCurrentIndex(),
-      );
-    } else {
-      this.stopProgressTracking();
-      this.updateState({ status: "idle" });
-    }
-  }
-
-  async playPrevious() {
-    if (this.state.progress > 3) {
-      await this.seekTo(0);
-      return;
-    }
-
-    const prevSong = this.queueService.previous();
-    if (prevSong) {
-      await this.playSong(
-        prevSong,
-        this.queueService.getQueue(),
-        this.queueService.getCurrentIndex(),
-      );
-    }
-  }
-
-  async seekTo(position: number) {
+  async playPrevious(): Promise<void> {
     try {
-      await this.audioService.seekTo(position);
-      await mediaSessionService.updatePlaybackState(
-        this.state.status === "playing",
-        position,
-      );
-      this.updateState({ progress: position });
-    } catch (error) {
-      logError("Seek", error);
-    }
-  }
+      const currentTime = this.player?.currentTime || 0;
 
-  toggleShuffle() {
-    this.queueService.toggleShuffle();
-    this.updateState({
-      isShuffled: this.queueService.isShuffled(),
-      ...this.getWindowedQueueState(),
-    });
-  }
+      const result = await queueService.getUpNext({
+        type: "previous",
+        seekPosition: currentTime,
+      });
 
-  async ensureBackgroundPlayback() {
-    try {
-      if (this.state.status !== "playing") return;
-
-      if (!this.audioService.isPlaying()) {
-        await this.audioService.play();
-        await mediaSessionService.updatePlaybackState(
-          true,
-          this.state.progress,
-        );
+      if (result.shouldRestart) {
+        await this.seekTo(0);
+        return;
       }
-    } catch (error) {
-      logError("Background playback", error);
+
+      if (result.song && result.shouldLoad) {
+        await this.loadAndPlay(result.song);
+        this.updateStateFromQueue(result);
+      }
+    } catch (e) {
+      this.handleError("playPrevious", e);
     }
   }
 
-  toggleRepeatMode() {
-    const newMode = this.queueService.toggleRepeatMode();
-    this.updateState({ repeatMode: newMode });
+  async seekTo(pos: number): Promise<void> {
+    try {
+      if (!this.player) return;
+
+      await this.player.seekTo(pos);
+      this.notify({ progress: pos });
+    } catch (e) {
+      this.handleError("seekTo", e);
+    }
   }
 
-  addToQueue(song: Models.Song) {
-    this.queueService.addToQueue(song);
-    this.updateState({ ...this.getWindowedQueueState() });
+  async jumpToQueueIndex(index: number): Promise<void> {
+    try {
+      const result = await queueService.getUpNext({
+        type: "jump",
+        index,
+      });
+
+      if (result.song && result.shouldLoad) {
+        await this.loadAndPlay(result.song);
+        this.updateStateFromQueue(result);
+      }
+    } catch (e) {
+      this.handleError("jumpToQueueIndex", e);
+    }
   }
 
-  addNextInQueue(song: Models.Song) {
-    this.queueService.addNextInQueue(song);
-    this.updateState({ ...this.getWindowedQueueState() });
-  }
+  async release(): Promise<void> {
 
-  getState(): PlayerState {
-    return this.state;
-  }
+    this.statusUnsubscribe?.remove();
+    this.statusUnsubscribe = null;
 
-  async release() {
-    this.stopProgressTracking();
-    await this.audioService.release();
-    await mediaSessionService.release();
-    this.queueService.clear();
-    this.updateState({
+
+    if (this.player) {
+      this.player.clearLockScreenControls();
+      this.player.remove();
+    }
+
+    this.player = null;
+    this.currentUrl = "";
+    this.audioModeReady = false;
+
+    await queueService.getUpNext({ type: "clear" });
+    this.notify({
       status: "idle",
       currentSong: null,
       currentIndex: -1,
@@ -452,6 +278,136 @@ export class PlayerService {
       duration: 0,
     });
   }
+
+  private async loadAndPlay(song: Models.Song): Promise<void> {
+    const encrypted =
+      song.media?.encryptedUrl ||
+      (await Song.getById({ songIds: song.id })).songs[0]?.media?.encryptedUrl;
+
+    if (!encrypted) throw new Error("No encrypted URL");
+
+    const urls = await Song.experimental.fetchStreamUrls(
+      encrypted,
+      "edge",
+      true,
+    );
+    const quality =
+      (await AsyncStorage.getItem(STORAGE_KEYS.CONTENT_QUALITY)) || "medium";
+    const idx =
+      AUDIO_QUALITY[quality.toUpperCase() as keyof typeof AUDIO_QUALITY] ||
+      AUDIO_QUALITY.MEDIUM;
+    const url = urls[idx].url;
+
+    if (!url) throw new Error("No streaming URL");
+
+    await this.ensureAudio();
+    if (!this.player) throw new Error("Player not initialized");
+
+
+    if (this.currentUrl !== url) {
+      this.player.replace(url);
+      this.currentUrl = url;
+    }
+
+    this.player.play();
+
+
+    this.updateLockScreenMetadata(song);
+
+    this.notify({
+      status: "playing",
+      currentSong: song,
+      progress: 0,
+    });
+
+    await this.save(0);
+  }
+
+  private updateLockScreenMetadata(song: Models.Song): void {
+    if (!this.player) return;
+
+    try {
+      const artist =
+        song.artists?.primary?.map((a) => a.name).join(", ") ||
+        "Unknown Artist";
+      const album =
+        typeof song.album === "string" ? song.album : song.album?.title || "";
+      const artworkUrl = song.images?.[2]?.url || song.images?.[0]?.url || "";
+
+      const metadata: AudioMetadata = {
+        title: song.title || "Unknown",
+        artist,
+        albumTitle: album || "Unknown Album",
+        artworkUrl: artworkUrl || undefined,
+      };
+
+      const options: AudioLockScreenOptions = {
+        showSeekBackward: true,
+        showSeekForward: true,
+      };
+
+      this.player.setActiveForLockScreen(true, metadata, options);
+    } catch (e) {
+      if (__DEV__) console.error("[Player] Lock screen update failed:", e);
+    }
+  }
+
+  private updateStateFromQueue(result: GetUpNextResult): void {
+    this.notify({
+      queue: result.windowedQueue,
+      currentIndex: result.windowedIndex,
+      isShuffled: result.isShuffled,
+      repeatMode: result.repeatMode,
+    });
+  }
+
+  private notify(updates: Partial<PlayerState>): void {
+    this.stateUpdater?.(updates);
+  }
+
+  private async save(pos: number): Promise<void> {
+
+    if (Math.abs(pos - this.lastSavePosition) < 1) return;
+    this.lastSavePosition = pos;
+
+    const state = queueService.getState();
+    const song = state.queue[state.currentIndex];
+    if (!song) return;
+
+    try {
+      const savedState: SavedState = {
+        currentSong: song,
+        seekPosition: pos,
+        timestamp: new Date().toISOString(),
+      };
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.PLAYER_STATE,
+        JSON.stringify(savedState),
+      );
+    } catch (e) {
+      if (__DEV__) console.error("[Player] Save failed:", e);
+    }
+  }
+
+  private handleError(context: string, error: unknown): void {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    if (__DEV__) {
+      console.error(`[PlayerService.${context}]`, error);
+    }
+    this.notify({ status: "error", error: msg });
+  }
 }
 
-export const playerService = new PlayerService(audioService, queueService);
+export const playerService = new PlayerService();
+
+export const initializeAudioMode = async (): Promise<void> => {
+  try {
+    await setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: true,
+      interruptionMode: "doNotMix",
+    });
+  } catch (e) {
+    if (__DEV__) console.error("[Player] Audio mode init failed:", e);
+  }
+};

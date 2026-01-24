@@ -1,30 +1,29 @@
 import { GenericMediaItem, TrackItem } from "@/components";
-import { AUDIO_QUALITY, COLORS } from "@/constants";
-import { usePlayer } from "@/contexts/PlayerContext";
-import { storageService } from "@/services/StorageService";
+import { AUDIO_QUALITY, COLORS, UI_CONFIG } from "@/constants";
+import { useHomeStore } from "@/stores/homeStore";
+import { usePlayerStore } from "@/stores/playerStore";
 import { getScreenPaddingBottom } from "@/utils/designSystem";
-import { handleAsync, logError } from "@/utils/errorHandler";
-import { Album, Models, Playlist, Song } from "@saavn-labs/sdk";
+import { Models } from "@saavn-labs/sdk";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import {
-  ActivityIndicator,
-  Dimensions,
-  FlatList,
-  Image,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Animated,
+    Dimensions,
+    FlatList,
+    Image,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  Chip,
-  IconButton,
-  Modal,
-  Portal,
-  RadioButton,
-  Text,
+    Chip,
+    IconButton,
+    Modal,
+    Portal,
+    RadioButton,
+    Text,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -36,32 +35,171 @@ interface HomeScreenProps {
 
 interface Section {
   title: string;
-  data: any[];
+  data: Models.Song[] | Models.Album[] | Models.Playlist[];
   type: "albums" | "playlists" | "songs";
 }
 
+interface QuickPickItem {
+  id: string;
+  title: string;
+  imageUrl: string;
+  type: "album" | "playlist";
+}
+
 const LANGUAGES = ["hindi", "english", "punjabi", "tamil", "telugu"];
-const TRENDING_LIMIT = 10;
-const RECENTLY_PLAYED_LIMIT = 6;
+const SKELETON_QUICK_PICKS = 6;
+const SKELETON_HORIZONTAL_ITEMS = 5;
+const SKELETON_SONG_ITEMS = 5;
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const QUICK_PICK_ITEM_WIDTH = (SCREEN_WIDTH - 32 - 12) / 2;
+
+const SkeletonQuickPick: React.FC = React.memo(() => {
+  const fadeAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(fadeAnim, {
+          toValue: 0.7,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [fadeAnim]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.quickPickItem,
+        styles.skeletonQuickPick,
+        { width: QUICK_PICK_ITEM_WIDTH, opacity: fadeAnim },
+      ]}
+    >
+      <View style={styles.skeletonQuickPickImage} />
+      <View style={styles.quickPickMeta}>
+        <View style={styles.skeletonQuickPickTitle} />
+      </View>
+    </Animated.View>
+  );
+});
+
+const SkeletonHorizontalItem: React.FC = React.memo(() => {
+  const fadeAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(fadeAnim, {
+          toValue: 0.7,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [fadeAnim]);
+
+  return (
+    <Animated.View style={[styles.skeletonCard, { opacity: fadeAnim }]}>
+      <View style={styles.skeletonCardImage} />
+      <View style={styles.skeletonCardTitle} />
+      <View style={styles.skeletonCardSubtitle} />
+    </Animated.View>
+  );
+});
+
+const SkeletonSongItem: React.FC = React.memo(() => {
+  const fadeAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(fadeAnim, {
+          toValue: 0.7,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [fadeAnim]);
+
+  return (
+    <Animated.View style={[styles.skeletonSongItem, { opacity: fadeAnim }]}>
+      <View style={styles.skeletonSongImage} />
+      <View style={styles.skeletonSongInfo}>
+        <View style={styles.skeletonSongTitle} />
+        <View style={styles.skeletonSongArtist} />
+      </View>
+    </Animated.View>
+  );
+});
+
+const QuickPickItem: React.FC<{
+  item: QuickPickItem;
+  onPress: () => void;
+}> = React.memo(({ item, onPress }) => (
+  <TouchableOpacity
+    style={[styles.quickPickItem, { width: QUICK_PICK_ITEM_WIDTH }]}
+    onPress={onPress}
+    activeOpacity={0.7}
+  >
+    <Image source={{ uri: item.imageUrl }} style={styles.quickPickImage} />
+    <View style={styles.quickPickMeta}>
+      <Text
+        numberOfLines={2}
+        style={styles.quickPickTitle}
+        variant="titleSmall"
+      >
+        {item.title}
+      </Text>
+    </View>
+  </TouchableOpacity>
+));
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
   onAlbumPress,
   onPlaylistPress,
   onSearchFocus,
 }) => {
-  const { playSong, currentSong } = usePlayer();
-  const [sections, setSections] = useState<Section[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedLanguage, setSelectedLanguage] = useState("hindi");
-  const [recentlyPlayed, setRecentlyPlayed] = useState<any[]>([]);
-  const [settingsModalVisible, setSettingsModalVisible] = useState(false);
-  const [contentQuality, setContentQuality] =
-    useState<keyof typeof AUDIO_QUALITY>("MEDIUM");
-
-  const { width } = Dimensions.get("window");
+  const { playSong, currentSong } = usePlayerStore();
   const insets = useSafeAreaInsets();
   const bottomPadding = getScreenPaddingBottom(true, true) + insets.bottom;
+
+  const {
+    sections,
+    loading,
+    selectedLanguage,
+    setSelectedLanguage,
+    quickPicks,
+    settingsModalVisible,
+    setSettingsModalVisible,
+    contentQuality,
+    setContentQuality,
+    loadPreferences,
+    loadHomeData,
+  } = useHomeStore();
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -71,84 +209,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   }, []);
 
   useEffect(() => {
-    loadUserPreferences();
-  }, []);
+    loadPreferences();
+    loadHomeData(selectedLanguage);
+  }, [loadPreferences, loadHomeData, selectedLanguage]);
 
   useEffect(() => {
-    loadHomeData();
-  }, [selectedLanguage]);
-
-  const loadUserPreferences = useCallback(async () => {
-    const result = await handleAsync(async () => {
-      const quality = await storageService.getContentQuality();
-      return quality;
-    }, "Failed to load user preferences");
-
-    if (result.success && result.data) {
-      setContentQuality(result.data as keyof typeof AUDIO_QUALITY);
+    if (selectedLanguage) {
+      loadHomeData(selectedLanguage);
     }
-  }, []);
-
-  const loadHomeData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    const result = await handleAsync(async () => {
-      const [trendingAlbums, trendingPlaylists, trendingSongs] =
-        await Promise.all([
-          Album.getTrending({ language: selectedLanguage }),
-          Playlist.getTrending({ language: selectedLanguage }),
-          Song.getTrending({ language: selectedLanguage }),
-        ]);
-
-      return { trendingAlbums, trendingPlaylists, trendingSongs };
-    }, "Failed to load home data");
-
-    if (result.success && result.data) {
-      const { trendingAlbums, trendingPlaylists, trendingSongs } = result.data;
-
-      // Build recently played from trending items
-      const mockRecentlyPlayed = [
-        ...trendingAlbums.slice(0, 3),
-        ...trendingPlaylists.slice(0, 3),
-      ].slice(0, RECENTLY_PLAYED_LIMIT);
-      setRecentlyPlayed(mockRecentlyPlayed);
-
-      // Build sections
-      const newSections: Section[] = [];
-
-      if (trendingSongs.length > 0) {
-        newSections.push({
-          title: "Trending Songs",
-          data: trendingSongs.slice(0, TRENDING_LIMIT),
-          type: "songs",
-        });
-      }
-
-      if (trendingAlbums.length > 0) {
-        newSections.push({
-          title: "Trending Albums",
-          data: trendingAlbums.slice(0, TRENDING_LIMIT),
-          type: "albums",
-        });
-      }
-
-      if (trendingPlaylists.length > 0) {
-        newSections.push({
-          title: "Featured Playlists",
-          data: trendingPlaylists.slice(0, TRENDING_LIMIT),
-          type: "playlists",
-        });
-      }
-
-      setSections(newSections);
-    } else {
-      setError(result.error || "Failed to load home data");
-      logError("HomeScreen.loadHomeData", result.error);
-    }
-
-    setLoading(false);
-  }, [selectedLanguage]);
+  }, [selectedLanguage, loadHomeData]);
 
   const handleTrackPress = useCallback(
     (track: Models.Song, allTracks: Models.Song[]) => {
@@ -158,149 +227,238 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     [playSong],
   );
 
-  const renderHorizontalList = (section: Section) => {
-    if (section.type === "albums") {
-      return (
-        <FlatList
-          data={section.data}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.horizontalList}
-          renderItem={({ item }) => (
-            <GenericMediaItem
-              data={item}
-              type="album"
-              onPress={() => onAlbumPress(item.id)}
-              horizontal
-            />
-          )}
-          keyExtractor={(item) => item.id}
-        />
-      );
-    }
-
-    if (section.type === "playlists") {
-      return (
-        <FlatList
-          data={section.data}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.horizontalList}
-          renderItem={({ item }) => (
-            <GenericMediaItem
-              data={item}
-              type="playlist"
-              onPress={() => onPlaylistPress(item.id)}
-              horizontal
-            />
-          )}
-          keyExtractor={(item) => item.id}
-        />
-      );
-    }
-
-    if (section.type === "songs") {
-      return (
-        <View>
-          {section.data.slice(0, 5).map((track) => (
-            <TrackItem
-              key={track.id}
-              track={track}
-              onPress={() => handleTrackPress(track, section.data)}
-              isActive={currentSong?.id === track.id}
-              onMenuAction={() => {}}
-            />
-          ))}
-        </View>
-      );
-    }
-
-    return null;
-  };
-
-  const renderRecentlyPlayedGrid = () => {
-    if (recentlyPlayed.length === 0) return null;
-
-    const itemWidth = (width - 32 - 12) / 2;
-
-    return (
-      <View style={styles.recentlyPlayedGrid}>
-        {recentlyPlayed.slice(0, 6).map((item, index) => (
-          <TouchableOpacity
-            key={`${item.id}-${index}`}
-            style={[styles.recentlyPlayedItem, { width: itemWidth }]}
-            onPress={() => {
-              if (item.type === "album" || item.images) {
-                onAlbumPress(item.id);
-              } else {
-                onPlaylistPress(item.id);
-              }
-            }}
-            activeOpacity={0.75}
-          >
-            <Image
-              source={{ uri: item.images?.[1]?.url || item.images?.[0]?.url }}
-              style={styles.recentlyPlayedImage}
-            />
-            <View style={styles.recentlyPlayedMeta}>
-              <Text
-                numberOfLines={2}
-                style={styles.recentlyPlayedTitle}
-                variant="titleSmall"
-              >
-                {item.title || item.name}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
-
-  const onSettingsPress = () => {
-    setSettingsModalVisible(true);
-  };
+  const handleQuickPickPress = useCallback(
+    (item: QuickPickItem) => {
+      if (item.type === "album") {
+        onAlbumPress(item.id);
+      } else {
+        onPlaylistPress(item.id);
+      }
+    },
+    [onAlbumPress, onPlaylistPress],
+  );
 
   const handleQualityChange = useCallback(
     async (quality: keyof typeof AUDIO_QUALITY) => {
-      setContentQuality(quality);
+      await setContentQuality(quality);
+    },
+    [setContentQuality],
+  );
 
-      const result = await handleAsync(
-        async () => await storageService.saveContentQuality(quality),
-        "Failed to save content quality",
-      );
+  const renderSkeletonQuickPicks = useCallback(
+    () => (
+      <View style={styles.quickPicksGrid}>
+        {Array.from({ length: UI_CONFIG.SKELETON_QUICK_PICKS }).map(
+          (_, index) => (
+            <SkeletonQuickPick key={index} />
+          ),
+        )}
+      </View>
+    ),
+    [],
+  );
 
-      if (!result.success) {
-        logError("HomeScreen.handleQualityChange", result.error);
+  const renderSkeletonHorizontalList = useCallback(
+    () => (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.horizontalList}
+      >
+        {Array.from({ length: UI_CONFIG.SKELETON_HORIZONTAL_ITEMS }).map(
+          (_, index) => (
+            <SkeletonHorizontalItem key={index} />
+          ),
+        )}
+      </ScrollView>
+    ),
+    [],
+  );
+
+  const renderSkeletonSongList = useCallback(
+    () => (
+      <View style={styles.skeletonSongList}>
+        {Array.from({ length: UI_CONFIG.SKELETON_SONG_ITEMS }).map(
+          (_, index) => (
+            <SkeletonSongItem key={index} />
+          ),
+        )}
+      </View>
+    ),
+    [],
+  );
+
+  const renderQuickPicks = useCallback(() => {
+    if (loading) return renderSkeletonQuickPicks();
+    if (quickPicks.length === 0) return null;
+
+    return (
+      <View style={styles.quickPicksGrid}>
+        {quickPicks.map((item) => (
+          <QuickPickItem
+            key={item.id}
+            item={item}
+            onPress={() => handleQuickPickPress(item)}
+          />
+        ))}
+      </View>
+    );
+  }, [loading, quickPicks, handleQuickPickPress, renderSkeletonQuickPicks]);
+
+  const renderSongsList = useCallback(
+    (songs: Models.Song[]) => (
+      <FlatList
+        data={songs}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <TrackItem
+            track={item}
+            onPress={() => handleTrackPress(item, songs)}
+            isActive={currentSong?.id === item.id}
+          />
+        )}
+        scrollEnabled={false}
+      />
+    ),
+    [currentSong, handleTrackPress],
+  );
+
+  const renderAlbumsList = useCallback(
+    (albums: Models.Album[]) => (
+      <FlatList
+        data={albums}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.horizontalList}
+        renderItem={({ item }) => (
+          <GenericMediaItem
+            data={item}
+            type="album"
+            onPress={() => onAlbumPress(item.id)}
+            horizontal
+          />
+        )}
+        keyExtractor={(item) => item.id}
+      />
+    ),
+    [onAlbumPress],
+  );
+
+  const renderPlaylistsList = useCallback(
+    (playlists: Models.Playlist[]) => (
+      <FlatList
+        data={playlists}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.horizontalList}
+        renderItem={({ item }) => (
+          <GenericMediaItem
+            data={item}
+            type="playlist"
+            onPress={() => onPlaylistPress(item.id)}
+            horizontal
+          />
+        )}
+        keyExtractor={(item) => item.id}
+      />
+    ),
+    [onPlaylistPress],
+  );
+
+  const renderSection = useCallback(
+    (section: Section) => {
+      switch (section.type) {
+        case "songs":
+          return renderSongsList(section.data as Models.Song[]);
+        case "albums":
+          return renderAlbumsList(section.data as Models.Album[]);
+        case "playlists":
+          return renderPlaylistsList(section.data as Models.Playlist[]);
+        default:
+          return null;
       }
     },
-    [],
+    [renderSongsList, renderAlbumsList, renderPlaylistsList],
+  );
+
+  const renderLanguageChips = useMemo(
+    () => (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.languageChips}
+        style={styles.languageChipsContainer}
+      >
+        {LANGUAGES.map((lang) => (
+          <Chip
+            key={lang}
+            onPress={() => setSelectedLanguage(lang)}
+            style={[
+              styles.chip,
+              selectedLanguage === lang && styles.chipSelected,
+            ]}
+            textStyle={[
+              styles.chipText,
+              selectedLanguage === lang && styles.chipTextSelected,
+            ]}
+            selectedColor="#000"
+          >
+            {lang.charAt(0).toUpperCase() + lang.slice(1)}
+          </Chip>
+        ))}
+      </ScrollView>
+    ),
+    [selectedLanguage],
+  );
+
+  const renderSkeletonSections = useCallback(
+    () => (
+      <>
+        <View style={styles.section}>
+          <View style={styles.skeletonSectionTitle} />
+          {renderSkeletonSongList()}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.skeletonSectionTitle} />
+          {renderSkeletonHorizontalList()}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.skeletonSectionTitle} />
+          {renderSkeletonHorizontalList()}
+        </View>
+      </>
+    ),
+    [renderSkeletonSongList, renderSkeletonHorizontalList],
   );
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#121212" />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+      />
 
-      {/* Fixed Header with gradient */}
       <LinearGradient
         colors={["#1db954", "#121212"]}
         style={styles.headerGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
       >
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <View style={styles.headerTop}>
             <Text variant="headlineMedium" style={styles.greeting}>
               {greeting}
             </Text>
-            <View style={styles.headerIcons}>
-              <IconButton
-                icon="cog"
-                iconColor="#fff"
-                size={24}
-                onPress={onSettingsPress}
-              />
-            </View>
+            <IconButton
+              icon="cog"
+              iconColor="#fff"
+              size={24}
+              onPress={() => setSettingsModalVisible(true)}
+              style={styles.settingsButton}
+            />
           </View>
 
           <TouchableOpacity
@@ -316,66 +474,30 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       </LinearGradient>
 
-      {/* Scrollable Content */}
-      <View style={styles.contentContainer}>
-        <ScrollView
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingBottom: bottomPadding },
-          ]}
-        >
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#1db954" />
-            </View>
-          ) : (
-            <>
-              {/* Language Chips */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.languageChips}
-                style={styles.languageChipsContainer}
-              >
-                {LANGUAGES.map((lang) => (
-                  <Chip
-                    key={lang}
-                    onPress={() => setSelectedLanguage(lang)}
-                    style={[
-                      styles.chip,
-                      selectedLanguage === lang && styles.chipSelected,
-                    ]}
-                    textStyle={[
-                      styles.chipText,
-                      selectedLanguage === lang && styles.chipTextSelected,
-                    ]}
-                    selectedColor="#000"
-                  >
-                    {lang.charAt(0).toUpperCase() + lang.slice(1)}
-                  </Chip>
-                ))}
-              </ScrollView>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: bottomPadding },
+        ]}
+      >
+        {renderLanguageChips}
 
-              {recentlyPlayed.length > 0 && (
-                <View style={styles.section}>{renderRecentlyPlayedGrid()}</View>
-              )}
+        <View style={styles.section}>{renderQuickPicks()}</View>
 
-              {sections.map((section, index) => (
-                <View key={`${section.title}-${index}`} style={styles.section}>
-                  <Text variant="titleLarge" style={styles.sectionTitle}>
-                    {section.title}
-                  </Text>
-                  {renderHorizontalList(section)}
-                </View>
-              ))}
-            </>
-          )}
-        </ScrollView>
-      </View>
+        {loading
+          ? renderSkeletonSections()
+          : sections.map((section, index) => (
+              <View key={`${section.title}-${index}`} style={styles.section}>
+                <Text variant="titleLarge" style={styles.sectionTitle}>
+                  {section.title}
+                </Text>
+                {renderSection(section)}
+              </View>
+            ))}
+      </ScrollView>
 
-      {/* Settings Modal */}
       <Portal>
         <Modal
           visible={settingsModalVisible}
@@ -388,7 +510,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
           <View style={styles.settingSection}>
             <Text variant="titleMedium" style={styles.settingLabel}>
-              Content Quality
+              Audio Quality
             </Text>
 
             <RadioButton.Group
@@ -399,17 +521,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             >
               <View style={styles.radioOption}>
                 <RadioButton.Android value="LOW" color={COLORS.PRIMARY} />
-                <Text style={styles.radioLabel}>Low</Text>
+                <Text style={styles.radioLabel}>Low - Save data</Text>
               </View>
 
               <View style={styles.radioOption}>
                 <RadioButton.Android value="MEDIUM" color={COLORS.PRIMARY} />
-                <Text style={styles.radioLabel}>Medium</Text>
+                <Text style={styles.radioLabel}>Medium - Balanced</Text>
               </View>
 
               <View style={styles.radioOption}>
                 <RadioButton.Android value="HIGH" color={COLORS.PRIMARY} />
-                <Text style={styles.radioLabel}>High</Text>
+                <Text style={styles.radioLabel}>High - Best quality</Text>
               </View>
             </RadioButton.Group>
           </View>
@@ -435,10 +557,6 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  contentContainer: {
-    flex: 1,
-    backgroundColor: COLORS.BACKGROUND,
-  },
   scrollContent: {
     flexGrow: 1,
   },
@@ -446,7 +564,6 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   header: {
-    paddingTop: 44,
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
@@ -461,35 +578,31 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 28,
   },
-  headerIcons: {
-    flexDirection: "row",
-    marginRight: -8,
+  settingsButton: {
+    margin: 0,
   },
   searchButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1f1f1f",
-    borderRadius: 24,
-    height: 46,
+    backgroundColor: "#fff",
+    borderRadius: 6,
+    height: 48,
     paddingRight: 14,
     paddingLeft: 4,
-    borderWidth: 1,
-    borderColor: "#2b2b2b",
   },
   searchButtonText: {
-    color: "#b3b3b3",
+    color: "#121212",
     fontSize: 14,
+    fontWeight: "600",
     marginLeft: -4,
   },
   languageChipsContainer: {
     marginBottom: 16,
-    marginHorizontal: 0,
   },
   languageChips: {
     flexDirection: "row",
     gap: 8,
     paddingHorizontal: 16,
-    paddingRight: 16,
   },
   chip: {
     backgroundColor: "#282828",
@@ -506,15 +619,8 @@ const styles = StyleSheet.create({
     color: "#000",
     fontWeight: "bold",
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    minHeight: 400,
-  },
   section: {
     marginBottom: 32,
-    paddingHorizontal: 0,
   },
   sectionTitle: {
     fontWeight: "bold",
@@ -526,44 +632,117 @@ const styles = StyleSheet.create({
   horizontalList: {
     paddingHorizontal: 16,
   },
-  recentlyPlayedGrid: {
+  quickPicksGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     paddingHorizontal: 16,
     gap: 12,
   },
-  recentlyPlayedItem: {
+  quickPickItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1f1f1f",
-    borderRadius: 10,
+    backgroundColor: "#282828",
+    borderRadius: 6,
     overflow: "hidden",
-    paddingRight: 12,
     height: 60,
     marginBottom: 8,
   },
-  recentlyPlayedImage: {
+  quickPickImage: {
     width: 60,
     height: 60,
   },
-  recentlyPlayedMeta: {
+  quickPickMeta: {
     flex: 1,
-    paddingLeft: 10,
-    paddingRight: 4,
+    paddingLeft: 12,
+    paddingRight: 12,
   },
-  recentlyPlayedTitle: {
+  quickPickTitle: {
     color: "#ffffff",
     fontWeight: "600",
-    fontSize: 14,
+    fontSize: 13,
   },
-  bottomPadding: {
-    backgroundColor: "transparent",
+  skeletonQuickPick: {
+    backgroundColor: "#282828",
+  },
+  skeletonQuickPickImage: {
+    width: 60,
+    height: 60,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+  },
+  skeletonQuickPickTitle: {
+    height: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 4,
+    width: "80%",
+  },
+  skeletonCard: {
+    width: 140,
+    marginRight: 12,
+  },
+  skeletonCardImage: {
+    width: 140,
+    height: 140,
+    borderRadius: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    marginBottom: 12,
+  },
+  skeletonCardTitle: {
+    height: 14,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 4,
+    marginBottom: 8,
+    width: "90%",
+  },
+  skeletonCardSubtitle: {
+    height: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 4,
+    width: "70%",
+  },
+  skeletonSongList: {
+    paddingHorizontal: 16,
+  },
+  skeletonSongItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  skeletonSongImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    marginRight: 12,
+  },
+  skeletonSongInfo: {
+    flex: 1,
+  },
+  skeletonSongTitle: {
+    height: 14,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 4,
+    marginBottom: 8,
+    width: "70%",
+  },
+  skeletonSongArtist: {
+    height: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 4,
+    width: "50%",
+  },
+  skeletonSectionTitle: {
+    height: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 4,
+    marginBottom: 16,
+    marginHorizontal: 16,
+    width: 160,
   },
   modalContainer: {
     backgroundColor: "#282828",
     marginHorizontal: 20,
     padding: 24,
-    borderRadius: 16,
+    borderRadius: 12,
   },
   modalTitle: {
     color: "#fff",
@@ -585,13 +764,13 @@ const styles = StyleSheet.create({
   },
   radioLabel: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 15,
     marginLeft: 8,
   },
   modalCloseButton: {
     backgroundColor: "#1db954",
     paddingVertical: 14,
-    borderRadius: 24,
+    borderRadius: 25,
     alignItems: "center",
     marginTop: 8,
   },

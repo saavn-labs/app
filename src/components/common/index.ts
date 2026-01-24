@@ -1,4 +1,3 @@
-// Common Components
 export { default as DetailScreenHeader } from "./DetailScreenHeader";
 export { default as EmptyState } from "./EmptyState";
 export { default as ErrorBoundary } from "./ErrorBoundary";

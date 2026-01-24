@@ -33,8 +33,7 @@ const GenericMediaItem: React.FC<GenericMediaItemProps> = memo(
 
     const getImageUrl = (): string => {
       if (!data.images || data.images.length === 0) return "";
-      // Use medium quality (index 2) or fallback to first available
-      return data.images[2]?.url || data.images[0]?.url || "";
+      return data.images[2]?.url;
     };
 
     const getTitle = (): string => {
@@ -121,7 +120,6 @@ const GenericMediaItem: React.FC<GenericMediaItemProps> = memo(
     );
   },
   (prevProps, nextProps) => {
-    // Custom comparison for better performance
     return (
       prevProps.data.id === nextProps.data.id &&
       prevProps.type === nextProps.type &&

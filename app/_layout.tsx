@@ -1,4 +1,5 @@
-import { PlayerProvider } from "@/contexts/PlayerContext";
+import { initializeAudioMode, playerService } from "@/services/PlayerService";
+import { useAudioPlayer } from "expo-audio";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -48,6 +49,13 @@ export default function Layout() {
     SpotifyMedium: require("../assets/fonts/SpotifyMedium.ttf"),
   });
 
+  const audioPlayer = useAudioPlayer({
+    headers: {
+      "Accept-Ranges": "bytes",
+      Range: "bytes=0-",
+    },
+  });
+
   useEffect(() => {
     if (fontsLoaded) {
       const text = RNText as typeof RNText & {
@@ -78,6 +86,20 @@ export default function Layout() {
     }
   }, [fontsLoaded, fontError]);
 
+  useEffect(() => {
+    console.log("[Layout] Initializing player...");
+    try {
+      console.log("[Layout] Setting audio player instance on playerService");
+      playerService.setAudioPlayer(audioPlayer);
+      console.log("[Layout] Audio player instance set successfully");
+
+      initializeAudioMode();
+      console.log("[Layout] Player initialization completed");
+    } catch (error) {
+      console.error("[Layout] Failed to initialize player:", error);
+    }
+  }, [audioPlayer]);
+
   if (!fontsLoaded && !fontError) {
     return null;
   }
@@ -85,51 +107,49 @@ export default function Layout() {
   return (
     <PaperProvider theme={theme}>
       <StatusBar backgroundColor="#121212" style="dark" />
-      <PlayerProvider>
-        <SafeAreaView
-          style={styles.root}
-          edges={["top", "bottom", "left", "right"]}
+      <SafeAreaView
+        style={styles.root}
+        edges={["top", "bottom", "left", "right"]}
+      >
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: styles.screenStyle,
+          }}
         >
-          <Stack
-            screenOptions={{
+          <Stack.Screen
+            name="(tabs)"
+            options={{
               headerShown: false,
               contentStyle: styles.screenStyle,
             }}
-          >
-            <Stack.Screen
-              name="(tabs)"
-              options={{
-                headerShown: false,
-                contentStyle: styles.screenStyle,
-              }}
-            />
-            <Stack.Screen
-              name="album/[id]"
-              options={{
-                presentation: "modal",
-                headerShown: false,
-                contentStyle: styles.screenStyle,
-              }}
-            />
-            <Stack.Screen
-              name="artist/[id]"
-              options={{
-                presentation: "modal",
-                headerShown: false,
-                contentStyle: styles.screenStyle,
-              }}
-            />
-            <Stack.Screen
-              name="playlist/[id]"
-              options={{
-                presentation: "modal",
-                headerShown: false,
-                contentStyle: styles.screenStyle,
-              }}
-            />
-          </Stack>
-        </SafeAreaView>
-      </PlayerProvider>
+          />
+          <Stack.Screen
+            name="album/[id]"
+            options={{
+              presentation: "modal",
+              headerShown: false,
+              contentStyle: styles.screenStyle,
+            }}
+          />
+          <Stack.Screen
+            name="artist/[id]"
+            options={{
+              presentation: "modal",
+              headerShown: false,
+              contentStyle: styles.screenStyle,
+            }}
+          />
+          <Stack.Screen
+            name="playlist/[id]"
+            options={{
+              presentation: "modal",
+              headerShown: false,
+              contentStyle: styles.screenStyle,
+            }}
+          />
+        </Stack>
+      </SafeAreaView>
     </PaperProvider>
   );
 }

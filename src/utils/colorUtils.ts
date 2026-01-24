@@ -1,62 +1,68 @@
-import { getColors } from "react-native-image-colors";
+import { Platform } from "react-native";
 import { imageColorCache } from "./cache";
+
+type ColorUpdateCallback = (color: string) => void;
 
 const DEFAULT_FALLBACK_COLOR = "#163f24";
 
+let getColorsFunction: any = null;
+
+try {
+  const imageColorsModule = require("react-native-image-colors");
+  getColorsFunction = imageColorsModule.getColors;
+} catch {
+  if (__DEV__) console.warn("react-native-image-colors not available");
+}
+
 export const extractDominantColor = async (
   imageUrl: string,
-  fallbackColor: string = DEFAULT_FALLBACK_COLOR,
+  fallbackColor: string = DEFAULT_FALLBACK_COLOR
 ): Promise<{ color: string }> => {
-  try {
-    if (!imageUrl) return { color: fallbackColor };
+  if (!imageUrl) return { color: fallbackColor };
 
-    // Check cache first for performance
-    const cached = imageColorCache.get(imageUrl);
-    if (cached) {
-      return { color: cached };
+  const cached = imageColorCache.get(imageUrl);
+  if (cached) return { color: cached };
+
+  let color = fallbackColor;
+
+  if (getColorsFunction) {
+    try {
+      const result = await getColorsFunction(imageUrl, {
+        fallback: fallbackColor,
+        quality: "low",
+        pixelSpacing: 5,
+      });
+
+      color = result.darkVibrant || fallbackColor;
+    } catch (error) {
+      if (__DEV__) console.warn("Color extraction failed:", error);
     }
-
-    const result = await getColors(imageUrl, {
-      fallback: fallbackColor,
-      quality: "low",
-      pixelSpacing: 5,
-    });
-
-    const color =
-      (result.platform === "android" && result.darkVibrant) || fallbackColor;
-
-    // Cache the result
-    imageColorCache.set(imageUrl, color);
-
-    return { color };
-  } catch (error) {
-    console.warn(`Color extraction error for ${imageUrl}:`, error);
-    return { color: fallbackColor };
   }
+
+  imageColorCache.set(imageUrl, color);
+  return { color };
 };
 
-/**
- * Generates a gradient array from a base color
- * @param baseColor - The base color to generate gradient from
- * @param opacity1 - Opacity for middle color (default: 0.87)
- * @param opacity2 - Opacity for end color (default: 0.73)
- * @returns Array of colors for gradient
- */
+export const extractAndUpdateColor = async (
+  imageUrl: string,
+  onColorExtracted: ColorUpdateCallback,
+  fallbackColor: string = DEFAULT_FALLBACK_COLOR
+): Promise<void> => {
+  const { color } = await extractDominantColor(imageUrl, fallbackColor);
+  onColorExtracted(color);
+};
+
 export const createColorGradient = (
   baseColor: string,
   opacity1: number = 0.95,
-  opacity2: number = 0.95,
+  opacity2: number = 0.95
 ): [string, string, string] => {
-  const opacity1Hex = Math.round(opacity1 * 255)
-    .toString(16)
-    .padStart(2, "0");
-  const opacity2Hex = Math.round(opacity2 * 255)
-    .toString(16)
-    .padStart(2, "0");
+  const toHex = (opacity: number) =>
+    Math.round(opacity * 255).toString(16).padStart(2, "0").toUpperCase();
 
   return [
     baseColor,
-    `${baseColor}${opacity1Hex.toUpperCase()}`,
-    `${baseColor}${opacity2Hex.toUpperCase()}`,
+    `${baseColor}${toHex(opacity1)}`,
+    `${baseColor}${toHex(opacity2)}`,
   ];
 };

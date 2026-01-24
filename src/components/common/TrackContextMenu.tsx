@@ -1,26 +1,26 @@
-import { usePlayer } from "@/contexts/PlayerContext";
-import { Collection, collectionService } from "@/services/CollectionService";
-import { storageService } from "@/services/StorageService";
+import { useLibraryStore } from "@/stores/libraryStore";
+import { usePlayerStore } from "@/stores/playerStore";
+import { formatShareMessage } from "@/utils/formatters";
 import { Models } from "@saavn-labs/sdk";
 import { useRouter } from "expo-router";
 import React, { memo, useCallback, useEffect, useState } from "react";
 import {
-  Alert,
-  Modal,
-  Share,
-  StyleSheet,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    Alert,
+    Modal,
+    Share,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Divider,
-  List,
-  Portal,
-  Surface,
-  Text,
-  useTheme,
+    ActivityIndicator,
+    Divider,
+    List,
+    Portal,
+    Surface,
+    Text,
+    useTheme,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -39,52 +39,47 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
 }) => {
   const theme = useTheme();
   const router = useRouter();
-  const { addToQueue, addNextInQueue } = usePlayer();
+  const { addToQueue, addNextInQueue } = usePlayerStore();
+  const {
+    collections,
+    favorites,
+    loadLibrary,
+    toggleFavorite,
+    addToCollection,
+  } = useLibraryStore();
   const insets = useSafeAreaInsets();
   const [showCollections, setShowCollections] = useState(false);
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      loadData();
-    } else {
-      // Reset state when menu closes
-      setShowCollections(false);
-    }
-  }, [visible, track.id]);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [colls, isFav] = await Promise.all([
-        collectionService.getCollections(),
-        storageService.isFavorite(track.id),
-      ]);
-      setCollections(colls);
-      setIsFavorite(isFav);
+      await loadLibrary();
     } catch (error) {
       console.error("Error loading menu data:", error);
     } finally {
       setLoading(false);
     }
-  }, [track.id]);
+  }, [loadLibrary]);
+
+  useEffect(() => {
+    if (visible) {
+      loadData();
+    } else {
+      setShowCollections(false);
+    }
+  }, [visible, track.id, loadData]);
 
   const handleToggleFavorite = useCallback(async () => {
     try {
-      if (isFavorite) {
-        await storageService.removeFavorite(track.id);
-      } else {
-        await storageService.addFavorite(track);
-      }
+      await toggleFavorite(track);
       onComplete?.();
       onDismiss();
     } catch (error) {
       console.error("Error toggling favorite:", error);
       Alert.alert("Error", "Failed to update favorites");
     }
-  }, [isFavorite, track, onComplete, onDismiss]);
+  }, [track, onComplete, onDismiss, toggleFavorite]);
 
   const handleAddToQueue = useCallback(() => {
     addToQueue(track);
@@ -101,7 +96,10 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
   const handleAddToCollection = useCallback(
     async (collectionId: string) => {
       try {
-        await collectionService.addToCollection(collectionId, track);
+        const success = await addToCollection(collectionId, track);
+        if (!success) {
+          throw new Error("Add to collection failed");
+        }
         setShowCollections(false);
         onComplete?.();
         onDismiss();
@@ -110,21 +108,13 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
         Alert.alert("Error", "Failed to add to collection");
       }
     },
-    [track, onComplete, onDismiss],
+    [track, onComplete, onDismiss, addToCollection],
   );
 
   const handleShare = useCallback(async () => {
     try {
-      const shareUrl = track.url || `https://www.jiosaavn.com/song/${track.id}`;
-      const artistsText =
-        track.artists?.primary?.map((a) => a.name).join(", ") || track.subtitle;
-      const message = `Check out "${track.title}" by ${artistsText} on JioSaavn`;
-
-      await Share.share({
-        message: `${message}\n${shareUrl}`,
-        url: shareUrl,
-        title: track.title,
-      });
+      const shareData = formatShareMessage(track);
+      await Share.share(shareData);
       onDismiss();
     } catch (error) {
       console.error("Error sharing:", error);
@@ -133,7 +123,7 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
 
   const handleGoToArtist = useCallback(() => {
     onDismiss();
-    // Extract artist ID from track data
+
     if (track.artists?.primary && track.artists.primary.length > 0) {
       const artistId = track.artists.primary[0].id;
       if (artistId) {
@@ -196,12 +186,24 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
       ) : (
         <>
           <List.Item
-            title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+            title={
+              favorites.some((s) => s.id === track.id)
+                ? "Remove from Favorites"
+                : "Add to Favorites"
+            }
             left={(props) => (
               <List.Icon
                 {...props}
-                icon={isFavorite ? "heart" : "heart-outline"}
-                color={isFavorite ? theme.colors.primary : undefined}
+                icon={
+                  favorites.some((s) => s.id === track.id)
+                    ? "heart"
+                    : "heart-outline"
+                }
+                color={
+                  favorites.some((s) => s.id === track.id)
+                    ? theme.colors.primary
+                    : undefined
+                }
               />
             )}
             onPress={handleToggleFavorite}
@@ -384,5 +386,4 @@ const styles = StyleSheet.create({
   },
 });
 
-// Memoize to prevent unnecessary re-renders
 export default memo(TrackContextMenu);

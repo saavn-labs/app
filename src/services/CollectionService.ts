@@ -1,3 +1,4 @@
+import { storageCache } from "@/utils/cache";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Models } from "@saavn-labs/sdk";
 
@@ -14,199 +15,166 @@ export interface Collection {
 }
 
 /**
- * CollectionService - Manages local playlists called "Collections"
- * This is Spotify-like local playlist functionality
+ * CollectionService manages user-created playlists/collections
+ * Handles CRUD operations and song management within collections
  */
 export class CollectionService {
   async getCollections(): Promise<Collection[]> {
-    try {
-      const data = await AsyncStorage.getItem(COLLECTIONS_KEY);
-      return data ? JSON.parse(data) : [];
-    } catch (error) {
-      console.error("Error getting collections:", error);
-      return [];
-    }
+    const cacheKey = COLLECTIONS_KEY;
+
+
+    const cached = storageCache.get(cacheKey);
+    if (cached !== null) return cached;
+
+
+    const data = await AsyncStorage.getItem(COLLECTIONS_KEY);
+    const result = data ? JSON.parse(data) : [];
+
+
+    storageCache.set(cacheKey, result);
+
+    return result;
   }
 
   async getCollection(collectionId: string): Promise<Collection | null> {
-    try {
-      const collections = await this.getCollections();
-      return collections.find((c) => c.id === collectionId) || null;
-    } catch (error) {
-      console.error("Error getting collection:", error);
-      return null;
-    }
+    const collections = await this.getCollections();
+    return collections.find((c) => c.id === collectionId) ?? null;
   }
 
   async createCollection(
     name: string,
     description?: string,
   ): Promise<Collection> {
-    try {
-      const collections = await this.getCollections();
-      const newCollection: Collection = {
-        id: Date.now().toString(),
-        name,
-        description,
-        songs: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      collections.push(newCollection);
-      await AsyncStorage.setItem(COLLECTIONS_KEY, JSON.stringify(collections));
-      return newCollection;
-    } catch (error) {
-      console.error("Error creating collection:", error);
-      throw error;
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      throw new Error("Collection name cannot be empty");
     }
+
+    const collections = await this.getCollections();
+
+    const newCollection: Collection = {
+      id: Date.now().toString(),
+      name: trimmedName,
+      description,
+      songs: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    collections.push(newCollection);
+    await this.saveCollections(collections);
+
+    return newCollection;
   }
 
   async renameCollection(collectionId: string, newName: string): Promise<void> {
-    try {
-      const collections = await this.getCollections();
-      const collection = collections.find((c) => c.id === collectionId);
-
-      if (collection) {
-        collection.name = newName;
-        collection.updatedAt = new Date().toISOString();
-        await AsyncStorage.setItem(
-          COLLECTIONS_KEY,
-          JSON.stringify(collections),
-        );
-      }
-    } catch (error) {
-      console.error("Error renaming collection:", error);
-      throw error;
+    const trimmedName = newName.trim();
+    if (!trimmedName) {
+      throw new Error("Collection name cannot be empty");
     }
+
+    const collections = await this.getCollections();
+    const collection = collections.find((c) => c.id === collectionId);
+
+    if (!collection) {
+      throw new Error(`Collection with id ${collectionId} not found`);
+    }
+
+    collection.name = trimmedName;
+    collection.updatedAt = new Date().toISOString();
+    await this.saveCollections(collections);
   }
 
   async updateCollectionDescription(
     collectionId: string,
     description: string,
   ): Promise<void> {
-    try {
-      const collections = await this.getCollections();
-      const collection = collections.find((c) => c.id === collectionId);
+    const collections = await this.getCollections();
+    const collection = collections.find((c) => c.id === collectionId);
 
-      if (collection) {
-        collection.description = description;
-        collection.updatedAt = new Date().toISOString();
-        await AsyncStorage.setItem(
-          COLLECTIONS_KEY,
-          JSON.stringify(collections),
-        );
-      }
-    } catch (error) {
-      console.error("Error updating collection description:", error);
-      throw error;
+    if (!collection) {
+      throw new Error(`Collection with id ${collectionId} not found`);
     }
+
+    collection.description = description;
+    collection.updatedAt = new Date().toISOString();
+    await this.saveCollections(collections);
   }
 
   async deleteCollection(collectionId: string): Promise<void> {
-    try {
-      const collections = await this.getCollections();
-      const filtered = collections.filter((c) => c.id !== collectionId);
-      await AsyncStorage.setItem(COLLECTIONS_KEY, JSON.stringify(filtered));
-    } catch (error) {
-      console.error("Error deleting collection:", error);
-      throw error;
-    }
+    const collections = await this.getCollections();
+    const filtered = collections.filter((c) => c.id !== collectionId);
+    await this.saveCollections(filtered);
   }
 
   async addToCollection(
     collectionId: string,
     song: Models.Song,
   ): Promise<void> {
-    try {
-      const collections = await this.getCollections();
-      const collection = collections.find((c) => c.id === collectionId);
+    const collections = await this.getCollections();
+    const collection = collections.find((c) => c.id === collectionId);
 
-      if (collection) {
-        const exists = collection.songs.some((s) => s.id === song.id);
-        if (!exists) {
-          collection.songs.push(song);
-          collection.updatedAt = new Date().toISOString();
-
-          if (!collection.coverUrl && song.images && song.images.length > 0) {
-            collection.coverUrl = song.images[0].url;
-          }
-
-          await AsyncStorage.setItem(
-            COLLECTIONS_KEY,
-            JSON.stringify(collections),
-          );
-        }
-      }
-    } catch (error) {
-      console.error("Error adding to collection:", error);
-      throw error;
+    if (!collection) {
+      throw new Error(`Collection with id ${collectionId} not found`);
     }
+
+    if (collection.songs.some((s) => s.id === song.id)) return;
+
+    collection.songs.push(song);
+    collection.updatedAt = new Date().toISOString();
+
+    if (!collection.coverUrl) {
+      collection.coverUrl = song.images?.[0]?.url;
+    }
+
+    await this.saveCollections(collections);
   }
 
   async addMultipleToCollection(
     collectionId: string,
     songs: Models.Song[],
   ): Promise<void> {
-    try {
-      const collections = await this.getCollections();
-      const collection = collections.find((c) => c.id === collectionId);
+    const collections = await this.getCollections();
+    const collection = collections.find((c) => c.id === collectionId);
 
-      if (collection) {
-        const songIds = new Set(collection.songs.map((s) => s.id));
-
-        songs.forEach((song) => {
-          if (!songIds.has(song.id)) {
-            collection.songs.push(song);
-            songIds.add(song.id);
-          }
-        });
-
-        collection.updatedAt = new Date().toISOString();
-
-        if (!collection.coverUrl && collection.songs.length > 0) {
-          const firstSong = collection.songs[0];
-          if (firstSong.images && firstSong.images.length > 0) {
-            collection.coverUrl = firstSong.images[0].url;
-          }
-        }
-
-        await AsyncStorage.setItem(
-          COLLECTIONS_KEY,
-          JSON.stringify(collections),
-        );
-      }
-    } catch (error) {
-      console.error("Error adding multiple songs to collection:", error);
-      throw error;
+    if (!collection) {
+      throw new Error(`Collection with id ${collectionId} not found`);
     }
+
+    const songIds = new Set(collection.songs.map((s) => s.id));
+    const newSongs = songs.filter((song) => !songIds.has(song.id));
+
+    if (newSongs.length === 0) return;
+
+    collection.songs.push(...newSongs);
+    collection.updatedAt = new Date().toISOString();
+
+    if (!collection.coverUrl && collection.songs.length > 0) {
+      collection.coverUrl = collection.songs[0].images?.[0]?.url;
+    }
+
+    await this.saveCollections(collections);
   }
 
   async removeFromCollection(
     collectionId: string,
     songId: string,
   ): Promise<void> {
-    try {
-      const collections = await this.getCollections();
-      const collection = collections.find((c) => c.id === collectionId);
+    const collections = await this.getCollections();
+    const collection = collections.find((c) => c.id === collectionId);
 
-      if (collection) {
-        collection.songs = collection.songs.filter((s) => s.id !== songId);
-        collection.updatedAt = new Date().toISOString();
-
-        if (collection.songs.length === 0) {
-          collection.coverUrl = undefined;
-        }
-
-        await AsyncStorage.setItem(
-          COLLECTIONS_KEY,
-          JSON.stringify(collections),
-        );
-      }
-    } catch (error) {
-      console.error("Error removing from collection:", error);
-      throw error;
+    if (!collection) {
+      throw new Error(`Collection with id ${collectionId} not found`);
     }
+
+    collection.songs = collection.songs.filter((s) => s.id !== songId);
+    collection.updatedAt = new Date().toISOString();
+
+    if (collection.songs.length === 0) {
+      collection.coverUrl = undefined;
+    }
+
+    await this.saveCollections(collections);
   }
 
   async reorderInCollection(
@@ -214,65 +182,34 @@ export class CollectionService {
     fromIndex: number,
     toIndex: number,
   ): Promise<void> {
-    try {
-      const collections = await this.getCollections();
-      const collection = collections.find((c) => c.id === collectionId);
+    const collections = await this.getCollections();
+    const collection = collections.find((c) => c.id === collectionId);
 
-      if (collection && fromIndex >= 0 && toIndex >= 0) {
-        const [song] = collection.songs.splice(fromIndex, 1);
-        collection.songs.splice(toIndex, 0, song);
-        collection.updatedAt = new Date().toISOString();
-
-        await AsyncStorage.setItem(
-          COLLECTIONS_KEY,
-          JSON.stringify(collections),
-        );
-      }
-    } catch (error) {
-      console.error("Error reordering in collection:", error);
-      throw error;
+    if (!collection) {
+      throw new Error(`Collection with id ${collectionId} not found`);
     }
+
+    const { songs } = collection;
+    if (
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= songs.length ||
+      toIndex >= songs.length
+    ) {
+      throw new Error("Invalid reorder indices");
+    }
+
+    const [song] = songs.splice(fromIndex, 1);
+    songs.splice(toIndex, 0, song);
+    collection.updatedAt = new Date().toISOString();
+
+    await this.saveCollections(collections);
   }
 
-  async isInCollection(collectionId: string, songId: string): Promise<boolean> {
-    try {
-      const collection = await this.getCollection(collectionId);
-      return collection ? collection.songs.some((s) => s.id === songId) : false;
-    } catch (error) {
-      console.error("Error checking if song is in collection:", error);
-      return false;
-    }
-  }
+  private async saveCollections(collections: Collection[]): Promise<void> {
+    await AsyncStorage.setItem(COLLECTIONS_KEY, JSON.stringify(collections));
 
-  async getCollectionsContainingSong(songId: string): Promise<Collection[]> {
-    try {
-      const collections = await this.getCollections();
-      return collections.filter((c) => c.songs.some((s) => s.id === songId));
-    } catch (error) {
-      console.error("Error getting collections containing song:", error);
-      return [];
-    }
-  }
-
-  async duplicateCollection(
-    collectionId: string,
-    newName: string,
-  ): Promise<Collection | null> {
-    try {
-      const original = await this.getCollection(collectionId);
-      if (!original) return null;
-
-      const newCollection = await this.createCollection(
-        newName,
-        original.description,
-      );
-      await this.addMultipleToCollection(newCollection.id, original.songs);
-
-      return newCollection;
-    } catch (error) {
-      console.error("Error duplicating collection:", error);
-      return null;
-    }
+    storageCache.invalidatePattern(/^@collections/);
   }
 }
 

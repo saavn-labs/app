@@ -3,13 +3,24 @@ import EmptyState from "@/components/common/EmptyState";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
 import TrackItem from "@/components/items/TrackItem";
 import { COLORS } from "@/constants";
-import { usePlayer } from "@/contexts/PlayerContext";
+import { useDetailStore } from "@/stores/detailStore";
+import {
+  useDominantColor,
+  usePlayerStore,
+  useSetDominantColor,
+} from "@/stores/playerStore";
 import { imageColorCache } from "@/utils/cache";
 import { getScreenPaddingBottom } from "@/utils/designSystem";
-import { handleAsync, logError } from "@/utils/errorHandler";
+import { handleAsync } from "@/utils/errorHandler";
 import { Album, Artist, Models, Playlist } from "@saavn-labs/sdk";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Animated,
   Dimensions,
@@ -24,7 +35,11 @@ import {
 import { IconButton, Text, useTheme } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { width } = Dimensions.get("window");
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+const HEADER_MAX_HEIGHT = 400;
+const HEADER_MIN_HEIGHT = 110;
+const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
 
 type DetailType = "album" | "playlist" | "artist";
 
@@ -48,9 +63,7 @@ interface DetailData {
   stats?: { songCount?: number };
 }
 
-const HEADER_MAX_HEIGHT = 400;
-const HEADER_MIN_HEIGHT = 110;
-const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
+type TabType = "songs" | "albums";
 
 const DetailScreen: React.FC<DetailScreenProps> = ({
   type,
@@ -60,17 +73,23 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
 }) => {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { playSong, currentSong, toggleShuffle, isShuffled } = usePlayer();
+  const { playSong, currentSong, toggleShuffle, isShuffled } = usePlayerStore();
+  const dominantColor = useDominantColor();
+  const setDominantColor = useSetDominantColor();
 
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedTab, setSelectedTab] = useState<"songs" | "albums">("songs");
-  const [dominantColor, setDominantColor] = useState("#1a1a1a");
-  const [isFullPlayerVisible, setFullPlayerVisible] = useState(false);
 
-  const scrollY = React.useRef(new Animated.Value(0)).current;
+  const {
+    selectedTab,
+    setSelectedTab,
+    isFullPlayerVisible,
+    setFullPlayerVisible,
+  } = useDetailStore();
+
+  const scrollY = useRef(new Animated.Value(0)).current;
   const bottomPadding = getScreenPaddingBottom(true, false) + insets.bottom;
 
   useEffect(() => {
@@ -83,42 +102,38 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
       setError(null);
 
       const result = await handleAsync(async () => {
-        let result: any;
         switch (type) {
           case "album":
-            result = await Album.getById({ albumId: id });
-            break;
+            return await Album.getById({ albumId: id });
           case "playlist":
-            result = await Playlist.getById({ playlistId: id });
-            break;
+            return await Playlist.getById({ playlistId: id });
           case "artist":
-            result = await Artist.getById({ artistId: id });
-            break;
+            return await Artist.getById({ artistId: id });
         }
-        return result;
       }, `Failed to load ${type}`);
 
       if (result.success && result.data) {
-        setData(result.data);
+        setData(result.data as DetailData);
 
-        // Handle dominant color with caching
         const imageUrl =
           result.data.images?.[2]?.url || result.data.images?.[0]?.url;
+
         if (imageUrl) {
-          // Check cache first
           const cachedColor = imageColorCache.get(imageUrl);
-          if (cachedColor) {
-            setDominantColor(cachedColor);
-          } else {
-            // Use default colors and cache them
-            const defaultColor = type === "artist" ? "#6366f1" : COLORS.PRIMARY;
-            setDominantColor(defaultColor);
-            imageColorCache.set(imageUrl, defaultColor);
+          const defaultColor = type === "artist" ? "#6366f1" : COLORS.PRIMARY;
+          const colorToUse = cachedColor || defaultColor;
+
+          setDominantColor(colorToUse);
+
+          if (!cachedColor) {
+            imageColorCache.set(imageUrl, colorToUse);
           }
         }
       } else {
         setError(result.error || `Failed to load ${type}`);
-        logError(`DetailScreen.loadData.${type}`, result.error);
+        if (__DEV__) {
+          console.error(`[DetailScreen.loadData.${type}]`, result.error);
+        }
       }
 
       setLoading(false);
@@ -132,7 +147,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
     loadData(true);
   }, [loadData]);
 
-  const getSongs = useCallback((): Models.Song[] => {
+  const songs = useMemo((): Models.Song[] => {
     if (!data) return [];
     if (type === "artist") {
       return (data.songs as { top?: Models.Song[] })?.top || [];
@@ -141,26 +156,23 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
   }, [data, type]);
 
   const handlePlayAll = useCallback(() => {
-    const songs = getSongs();
-    if (songs && songs.length > 0) {
+    if (songs.length > 0) {
       playSong(songs[0], songs, 0);
     }
-  }, [getSongs, playSong]);
+  }, [songs, playSong]);
 
   const handleShuffle = useCallback(() => {
-    const songs = getSongs();
-    if (songs && songs.length > 0) {
+    if (songs.length > 0) {
       toggleShuffle();
       playSong(songs[0], songs, 0);
     }
-  }, [getSongs, playSong, toggleShuffle]);
+  }, [songs, playSong, toggleShuffle]);
 
   const handleTrackPress = useCallback(
     (track: Models.Song, index: number) => {
-      const songs = getSongs();
       playSong(track, songs, index);
     },
-    [playSong, getSongs],
+    [playSong, songs],
   );
 
   const handleShare = useCallback(async () => {
@@ -183,8 +195,30 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
     }, "Failed to share");
 
     if (!result.success) {
-      logError("DetailScreen.handleShare", result.error);
+      if (__DEV__) {
+        console.error("[DetailScreen.handleShare]", result.error);
+      }
     }
+  }, [data, type]);
+
+  const metadata = useMemo(() => {
+    if (!data) return "";
+
+    const parts: string[] = [];
+
+    if (type === "album") {
+      if (data.year) parts.push(String(data.year));
+      if ((data.stats as any)?.songCount) {
+        parts.push(`${(data.stats as any).songCount} songs`);
+      }
+    } else if (type === "playlist") {
+      const playlistSongs = data.songs as Models.Song[];
+      if (playlistSongs?.length) {
+        parts.push(`${playlistSongs.length} songs`);
+      }
+    }
+
+    return parts.join(" • ");
   }, [data, type]);
 
   const renderTrackItem = useCallback(
@@ -217,61 +251,41 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
     [],
   );
 
-  const imageOpacity = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE / 2, HEADER_SCROLL_DISTANCE],
-    outputRange: [1, 0.3, 0],
-    extrapolate: "clamp",
-  });
-
-  const imageScale = scrollY.interpolate({
-    inputRange: [-100, 0, HEADER_SCROLL_DISTANCE],
-    outputRange: [1.3, 1, 0.8],
-    extrapolate: "clamp",
-  });
-
-  const titleOpacity = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE - 50, HEADER_SCROLL_DISTANCE],
-    outputRange: [1, 1, 0],
-    extrapolate: "clamp",
-  });
-
-  const titleTranslateY = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE],
-    outputRange: [0, -20],
-    extrapolate: "clamp",
-  });
-
-  const miniTitleOpacity = scrollY.interpolate({
-    inputRange: [HEADER_SCROLL_DISTANCE - 40, HEADER_SCROLL_DISTANCE],
-    outputRange: [0, 1],
-    extrapolate: "clamp",
-  });
-
-  const headerBackgroundOpacity = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE],
-    outputRange: [0, 1],
-    extrapolate: "clamp",
-  });
-
-  const getMetadata = useMemo(() => {
-    if (!data) return "";
-
-    const parts: string[] = [];
-
-    if (type === "album") {
-      if (data.year) parts.push(String(data.year));
-      if ((data.stats as any)?.songCount) {
-        parts.push(`${(data.stats as any).songCount} songs`);
-      }
-    } else if (type === "playlist") {
-      const songs = data.songs as Models.Song[];
-      if (songs && songs.length > 0) {
-        parts.push(`${songs.length} songs`);
-      }
-    }
-
-    return parts.join(" • ");
-  }, [data, type]);
+  const animatedStyles = useMemo(
+    () => ({
+      imageOpacity: scrollY.interpolate({
+        inputRange: [0, HEADER_SCROLL_DISTANCE / 2, HEADER_SCROLL_DISTANCE],
+        outputRange: [1, 0.3, 0],
+        extrapolate: "clamp",
+      }),
+      imageScale: scrollY.interpolate({
+        inputRange: [-100, 0, HEADER_SCROLL_DISTANCE],
+        outputRange: [1.3, 1, 0.8],
+        extrapolate: "clamp",
+      }),
+      titleOpacity: scrollY.interpolate({
+        inputRange: [0, HEADER_SCROLL_DISTANCE - 50, HEADER_SCROLL_DISTANCE],
+        outputRange: [1, 1, 0],
+        extrapolate: "clamp",
+      }),
+      titleTranslateY: scrollY.interpolate({
+        inputRange: [0, HEADER_SCROLL_DISTANCE],
+        outputRange: [0, -20],
+        extrapolate: "clamp",
+      }),
+      miniTitleOpacity: scrollY.interpolate({
+        inputRange: [HEADER_SCROLL_DISTANCE - 40, HEADER_SCROLL_DISTANCE],
+        outputRange: [0, 1],
+        extrapolate: "clamp",
+      }),
+      headerBackgroundOpacity: scrollY.interpolate({
+        inputRange: [0, HEADER_SCROLL_DISTANCE],
+        outputRange: [0, 1],
+        extrapolate: "clamp",
+      }),
+    }),
+    [scrollY],
+  );
 
   if (loading && !refreshing) {
     return <LoadingSpinner />;
@@ -294,9 +308,11 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
   const displayName = data.title || data.name || "Unknown";
   const imageUrl = data.images?.[2]?.url || data.images?.[0]?.url;
   const isArtist = type === "artist";
-  const songs = getSongs();
 
   if (isArtist) {
+    const topSongs = songs.slice(0, ARTIST_TOP_SONGS_LIMIT);
+    const albums = data.albums?.top || [];
+
     return (
       <View style={styles.container}>
         <Animated.ScrollView
@@ -353,7 +369,6 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
               { backgroundColor: theme.colors.background },
             ]}
           >
-            {/* Action Buttons */}
             <View style={styles.artistActionsContainer}>
               <TouchableOpacity
                 onPress={handlePlayAll}
@@ -400,7 +415,6 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Tabs */}
             <View style={styles.tabsContainer}>
               <TouchableOpacity
                 onPress={() => setSelectedTab("songs")}
@@ -449,21 +463,20 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Content */}
             <View style={styles.artistContent}>
-              {selectedTab === "songs" && songs && (
+              {selectedTab === "songs" && (
                 <FlatList
-                  data={songs.slice(0, 10)} // Top 10 for artists
+                  data={topSongs}
                   renderItem={renderTrackItem}
                   keyExtractor={keyExtractor}
                   scrollEnabled={false}
-                  initialNumToRender={10}
+                  initialNumToRender={ARTIST_TOP_SONGS_LIMIT}
                 />
               )}
 
-              {selectedTab === "albums" && data.albums?.top && (
+              {selectedTab === "albums" && (
                 <FlatList
-                  data={data.albums.top}
+                  data={albums}
                   renderItem={renderAlbumItem}
                   keyExtractor={keyExtractor}
                   scrollEnabled={false}
@@ -477,19 +490,28 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
 
           <View style={{ height: bottomPadding + 20 }} />
         </Animated.ScrollView>
+
+        <CompactPlayer
+          onPress={() => setFullPlayerVisible(true)}
+          style={styles.compactPlayerOffset}
+        />
+
+        <FullPlayer
+          visible={isFullPlayerVisible}
+          onClose={() => setFullPlayerVisible(false)}
+        />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Fixed Header Bar */}
       <Animated.View
         style={[
           styles.fixedHeader,
           {
             backgroundColor: theme.colors.background,
-            opacity: headerBackgroundOpacity,
+            opacity: animatedStyles.headerBackgroundOpacity,
           },
         ]}
       >
@@ -506,7 +528,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
             style={[
               styles.fixedHeaderTitle,
               {
-                opacity: miniTitleOpacity,
+                opacity: animatedStyles.miniTitleOpacity,
                 color: theme.colors.onSurface,
               },
             ]}
@@ -517,7 +539,6 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
         </View>
       </Animated.View>
 
-      {/* Scrollable Content */}
       <Animated.ScrollView
         scrollEventThrottle={16}
         onScroll={Animated.event(
@@ -534,7 +555,6 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
           />
         }
       >
-        {/* Hero Header with Image */}
         <LinearGradient
           colors={[
             dominantColor,
@@ -547,8 +567,8 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
             style={[
               styles.heroImageContainer,
               {
-                opacity: imageOpacity,
-                transform: [{ scale: imageScale }],
+                opacity: animatedStyles.imageOpacity,
+                transform: [{ scale: animatedStyles.imageScale }],
               },
             ]}
           >
@@ -568,7 +588,6 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
           />
         </LinearGradient>
 
-        {/* Title and Metadata */}
         <View
           style={[
             styles.infoSection,
@@ -579,8 +598,8 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
             style={[
               styles.titleContainer,
               {
-                opacity: titleOpacity,
-                transform: [{ translateY: titleTranslateY }],
+                opacity: animatedStyles.titleOpacity,
+                transform: [{ translateY: animatedStyles.titleTranslateY }],
               },
             ]}
           >
@@ -600,7 +619,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
               </Text>
             )}
 
-            {getMetadata && (
+            {metadata && (
               <Text
                 variant="bodySmall"
                 style={[
@@ -608,12 +627,11 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
                   { color: theme.colors.onSurfaceVariant },
                 ]}
               >
-                {getMetadata}
+                {metadata}
               </Text>
             )}
           </Animated.View>
 
-          {/* Action Buttons */}
           <View style={styles.actionsRow}>
             <TouchableOpacity
               onPress={handlePlayAll}
@@ -658,7 +676,6 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Track List */}
           <View style={styles.trackList}>
             <FlatList
               data={songs}
@@ -706,7 +723,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 100,
-    paddingTop: 0,
     height: 56,
   },
   fixedHeaderContent: {
@@ -724,7 +740,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     flex: 1,
   },
-
   heroHeader: {
     height: HEADER_MAX_HEIGHT,
     justifyContent: "flex-end",
@@ -738,8 +753,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   heroImage: {
-    width: width * 0.7,
-    height: width * 0.7,
+    width: SCREEN_WIDTH * 0.7,
+    height: SCREEN_WIDTH * 0.7,
     borderRadius: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 12 },
@@ -754,7 +769,6 @@ const styles = StyleSheet.create({
     margin: 0,
     backgroundColor: "rgba(0,0,0,0.3)",
   },
-
   infoSection: {
     paddingTop: 20,
   },
@@ -778,7 +792,6 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     opacity: 0.7,
   },
-
   actionsRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -810,11 +823,9 @@ const styles = StyleSheet.create({
   actionIcon: {
     margin: 0,
   },
-
   trackList: {
     paddingTop: 8,
   },
-
   artistHeaderGradient: {
     paddingTop: 80,
   },
@@ -854,14 +865,12 @@ const styles = StyleSheet.create({
     color: "#ffffffdd",
     fontWeight: "500",
   },
-
   contentWrapper: {
     flex: 1,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
     marginTop: -12,
   },
-
   artistActionsContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -870,7 +879,6 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     gap: 16,
   },
-
   tabsContainer: {
     flexDirection: "row",
     paddingHorizontal: 20,
@@ -888,11 +896,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "rgba(255,255,255,0.5)",
   },
-
   artistContent: {
     paddingTop: 8,
   },
-
   albumGrid: {
     gap: 12,
     paddingHorizontal: 20,

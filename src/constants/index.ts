@@ -1,8 +1,3 @@
-/**
- * Application Constants
- * Centralized configuration for maintainability
- */
-
 export const STORAGE_KEYS = {
   FAVORITES: "@favorites",
   COLLECTIONS: "@collections",
@@ -33,6 +28,14 @@ export const UI_CONFIG = {
   MAX_RECENT_SEARCHES: 10,
   DEFAULT_PAGE_SIZE: 20,
   SKELETON_ITEMS: 5,
+  SKELETON_QUICK_PICKS: 6,
+  SKELETON_HORIZONTAL_ITEMS: 5,
+  SKELETON_SONG_ITEMS: 5,
+  HOME_TRENDING_LIMIT: 10,
+  HOME_QUICK_PICKS_LIMIT: 6,
+  HOME_TRENDING_SONGS_LIMIT: 5,
+  ARTIST_TOP_SONGS_LIMIT: 10,
+  ARTIST_TOP_ALBUMS_LIMIT: 10,
 } as const;
 
 export const AUDIO_QUALITY = {

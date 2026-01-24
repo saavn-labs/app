@@ -1,13 +1,14 @@
 import CompactPlayer from "@/components/player/CompactPlayer";
 import FullPlayer from "@/components/player/FullPlayer";
+import { useUIStore } from "@/stores/uiStore";
 import { sizes } from "@/utils";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import React, { useState } from "react";
+import React from "react";
 import { StyleSheet, View } from "react-native";
 
 export default function TabLayout() {
-  const [isFullPlayerVisible, setFullPlayerVisible] = useState(false);
+  const { isFullPlayerVisible, setFullPlayerVisible } = useUIStore();
 
   return (
     <View style={styles.root}>

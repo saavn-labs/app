@@ -1,13 +1,27 @@
 import { Models } from "@saavn-labs/sdk";
 
-// Media types
 export type MediaType = "song" | "album" | "artist" | "playlist" | "collection";
-
-// Player types
 export type PlayerStatus = "idle" | "loading" | "playing" | "paused" | "error";
-export type RepeatMode = boolean; // true = repeat on, false = repeat off
+export type RepeatMode = boolean;
+export type SearchCategory = "songs" | "albums" | "artists" | "playlists";
+export type SearchTab = SearchCategory | null;
 
-// Navigation types
+export type Language =
+  | "hindi"
+  | "english"
+  | "punjabi"
+  | "tamil"
+  | "telugu"
+  | "kannada"
+  | "bengali"
+  | "marathi";
+
+export interface AsyncState<T> {
+  data: T | null;
+  loading: boolean;
+  error: string | null;
+}
+
 export interface NavigationProps {
   onAlbumPress?: (albumId: string) => void;
   onArtistPress?: (artistId: string) => void;
@@ -16,7 +30,6 @@ export interface NavigationProps {
   onCollectionPress?: (collectionId: string) => void;
 }
 
-// Common component props
 export interface BaseItemProps {
   onPress: () => void;
   horizontal?: boolean;
@@ -30,7 +43,6 @@ export interface TrackListProps {
   activeTrackId?: string;
 }
 
-// Collection types
 export interface Collection {
   id: string;
   name: string;
@@ -41,35 +53,11 @@ export interface Collection {
   coverUrl?: string;
 }
 
-// History types
 export interface HistoryEntry {
   song: Models.Song;
   playedAt: string;
-  duration?: number;
+  duration: number;
 }
-
-// Error types
-export interface AppError {
-  message: string;
-  code?: string;
-  details?: unknown;
-}
-
-// API Response types
-export interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  hasMore: boolean;
-  nextPage?: number;
-}
-
-// Search types
-export type SearchCategory =
-  | "all"
-  | "songs"
-  | "albums"
-  | "artists"
-  | "playlists";
 
 export interface SearchResults {
   songs: Models.Song[];
@@ -78,27 +66,6 @@ export interface SearchResults {
   playlists: Models.Playlist[];
 }
 
-// Language types
-export type Language =
-  | "hindi"
-  | "english"
-  | "punjabi"
-  | "tamil"
-  | "telugu"
-  | "kannada"
-  | "bengali"
-  | "marathi";
-
-// Storage keys
-export enum StorageKeys {
-  FAVORITES = "@favorites",
-  COLLECTIONS = "@collections",
-  HISTORY = "@history",
-  RECENT_SEARCHES = "@recent_searches",
-  USER_PREFERENCES = "@user_preferences",
-}
-
-// User preferences
 export interface UserPreferences {
   defaultLanguage: Language;
   audioQuality: "low" | "medium" | "high";
@@ -108,14 +75,6 @@ export interface UserPreferences {
   gaplessPlayback: boolean;
 }
 
-// Queue metadata
-export interface QueueMetadata {
-  source: "sequential" | "shuffled" | "radio";
-  createdAt: string;
-  originalQueue?: Models.Song[];
-}
-
-// Media item that can be any type of media
 export interface MediaItem {
   id: string;
   type: MediaType;
@@ -124,4 +83,11 @@ export interface MediaItem {
   subtitle?: string;
   images?: Array<{ url: string; quality?: string }>;
   songs?: Models.Song[];
+}
+
+export interface LoadingStates {
+  songs: boolean;
+  albums: boolean;
+  artists: boolean;
+  playlists: boolean;
 }

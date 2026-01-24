@@ -20,16 +20,27 @@ allprojects {
   }
 }
 
+// Global JVM compatibility configuration for all modules
 subprojects {
-  tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { 
-    kotlinOptions {
-      jvmTarget = "17"
+  afterEvaluate {
+    def android = extensions.findByName("android")
+    if (android != null) {
+      // Ensure Java compilation target is 17
+      android.compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+      }
+      
+      // Try to set Kotlin JVM target to match if Kotlin is available
+      try {
+        android.kotlinOptions {
+          jvmTarget = '17'
+        }
+      } catch (Exception e) {
+        // If kotlinOptions is not available, skip
+      }
     }
   }
-  tasks.withType(JavaCompile).configureEach {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17 
-  }  
 }
 
 apply plugin: "expo-root-project"

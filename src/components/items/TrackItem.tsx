@@ -1,8 +1,9 @@
+import { formatTrackSubtitle } from "@/utils/formatters";
+import { MaterialIcons } from "@expo/vector-icons";
 import { Models } from "@saavn-labs/sdk";
 import React, { memo, useCallback, useMemo, useState } from "react";
 import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
-import { IconButton, Text, useTheme } from "react-native-paper";
-import { MaterialIcons } from "@expo/vector-icons";
+import { Text, useTheme } from "react-native-paper";
 import TrackContextMenu from "../common/TrackContextMenu";
 
 interface TrackItemProps {
@@ -27,18 +28,7 @@ const TrackItem: React.FC<TrackItemProps> = ({
   const theme = useTheme();
   const [showMenu, setShowMenu] = useState(false);
 
-  const subtitle = useMemo(() => {
-    if (track.subtitle) return track.subtitle;
-
-    const parts = [];
-    if (track.artists?.primary) {
-      const artistNames = track.artists.primary.map((a) => a.name).join(", ");
-      if (artistNames) parts.push(artistNames);
-    }
-    if (track.album?.title) parts.push(track.album.title);
-
-    return parts.length > 0 ? parts.join(" • ") : "Unknown";
-  }, [track.subtitle, track.artists, track.album]);
+  const subtitle = useMemo(() => formatTrackSubtitle(track), [track]);
 
   const handleMenuPress = useCallback((e: any) => {
     e?.stopPropagation?.();

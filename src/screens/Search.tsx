@@ -1,22 +1,28 @@
 import { GenericMediaItem, TrackItem } from "@/components";
 import { UI_CONFIG } from "@/constants";
-import { usePlayer } from "@/contexts/PlayerContext";
-import { storageService } from "@/services/StorageService";
+import { useCurrentSong, usePlayerActions } from "@/stores/playerStore";
+import { useSearchStore } from "@/stores/searchStore";
 import { getScreenPaddingBottom } from "@/utils/designSystem";
-import { handleAsync, logError } from "@/utils/errorHandler";
-import { Album, Artist, Extras, Models, Playlist, Song } from "@saavn-labs/sdk";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Models } from "@saavn-labs/sdk";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import {
-  Animated,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Animated,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { IconButton, Searchbar, Text, useTheme } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import VoiceSearchModal from "../components/search/VoiceSearchModal";
 
-type SearchTab = "all" | "songs" | "albums" | "artists" | "playlists";
+type SearchTab = "songs" | "albums" | "artists" | "playlists";
 
 interface SearchScreenProps {
   onAlbumPress: (albumId: string) => void;
@@ -25,21 +31,10 @@ interface SearchScreenProps {
   onBack?: () => void;
 }
 
-interface SearchResults {
-  songs: Models.Song[];
-  albums: Models.Album[];
-  artists: Models.Artist[];
-  playlists: Models.Playlist[];
-}
+const MIN_SEARCH_LENGTH = 2;
+const MAX_RECENT_SEARCHES_DISPLAY = 5;
 
-interface LoadingStates {
-  songs: boolean;
-  albums: boolean;
-  artists: boolean;
-  playlists: boolean;
-}
-
-const SkeletonItem: React.FC = () => {
+const SkeletonItem = React.memo(() => {
   const fadeAnim = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
@@ -72,87 +67,134 @@ const SkeletonItem: React.FC = () => {
       </View>
     </View>
   );
-};
+});
 
-const SkeletonList: React.FC<{ count?: number }> = ({ count = 5 }) => (
-  <View style={styles.section}>
-    {Array.from({ length: count }).map((_, index) => (
-      <SkeletonItem key={index} />
-    ))}
-  </View>
+const SkeletonList = React.memo(
+  ({ count = UI_CONFIG.SKELETON_ITEMS }: { count?: number }) => (
+    <View style={styles.section}>
+      {Array.from({ length: count }).map((_, index) => (
+        <SkeletonItem key={`skeleton-${index}`} />
+      ))}
+    </View>
+  ),
 );
 
-const RecentSearches: React.FC<{
-  searches: string[];
-  onSelect: (search: string) => void;
-  onRemove: (search: string) => void;
-  onClearAll: () => void;
-}> = ({ searches, onSelect, onRemove, onClearAll }) => {
-  const theme = useTheme();
+const RecentSearchItem = React.memo(
+  ({
+    search,
+    onPress,
+    onRemove,
+  }: {
+    search: string;
+    onPress: () => void;
+    onRemove: () => void;
+  }) => {
+    const theme = useTheme();
 
-  if (searches.length === 0) return null;
-
-  return (
-    <View style={styles.recentSection}>
-      <View style={styles.recentHeader}>
-        <Text variant="titleLarge" style={styles.recentTitle}>
-          Recent searches
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        style={styles.recentItem}
+        activeOpacity={0.7}
+      >
+        <IconButton
+          icon="clock-outline"
+          size={20}
+          iconColor={theme.colors.onSurfaceVariant}
+          style={styles.recentIcon}
+        />
+        <Text
+          variant="bodyLarge"
+          style={styles.recentSearchText}
+          numberOfLines={1}
+        >
+          {search}
         </Text>
-        <TouchableOpacity onPress={onClearAll} activeOpacity={0.7}>
-          <Text style={[styles.clearText, { color: theme.colors.primary }]}>
-            Clear all
+        <IconButton
+          icon="close"
+          size={18}
+          iconColor={theme.colors.onSurfaceVariant}
+          onPress={(e) => {
+            e?.stopPropagation?.();
+            onRemove();
+          }}
+          style={styles.removeIcon}
+        />
+      </TouchableOpacity>
+    );
+  },
+);
+
+const RecentSearches = React.memo(
+  ({
+    searches,
+    onSelect,
+    onRemove,
+    onClearAll,
+    maxDisplay = MAX_RECENT_SEARCHES_DISPLAY,
+  }: {
+    searches: string[];
+    onSelect: (search: string) => void;
+    onRemove: (search: string) => void;
+    onClearAll: () => void;
+    maxDisplay?: number;
+  }) => {
+    const theme = useTheme();
+
+    if (searches.length === 0) return null;
+
+    const displaySearches = searches.slice(0, maxDisplay);
+
+    return (
+      <View style={styles.recentSection}>
+        <View style={styles.recentHeader}>
+          <Text variant="titleMedium" style={styles.recentTitle}>
+            Recent searches
           </Text>
-        </TouchableOpacity>
-      </View>
-      <View style={styles.recentList}>
-        {searches.map((search, index) => (
-          <TouchableOpacity
-            key={`${search}-${index}`}
-            onPress={() => onSelect(search)}
-            style={styles.recentItem}
-            activeOpacity={0.7}
-          >
-            <View style={styles.recentItemLeft}>
-              <IconButton
-                icon="clock-outline"
-                size={20}
-                iconColor={theme.colors.onSurfaceVariant}
-                style={styles.recentIcon}
-              />
-              <Text variant="bodyLarge" style={styles.recentSearchText}>
-                {search}
-              </Text>
-            </View>
-            <IconButton
-              icon="close"
-              size={18}
-              iconColor={theme.colors.onSurfaceVariant}
-              onPress={(e) => {
-                e.stopPropagation();
-                onRemove(search);
-              }}
-              style={styles.removeIcon}
-            />
+          <TouchableOpacity onPress={onClearAll} activeOpacity={0.7}>
+            <Text style={[styles.clearText, { color: theme.colors.primary }]}>
+              Clear all
+            </Text>
           </TouchableOpacity>
+        </View>
+        {displaySearches.map((item, index) => (
+          <RecentSearchItem
+            key={`recent-${index}`}
+            search={item}
+            onPress={() => onSelect(item)}
+            onRemove={() => onRemove(item)}
+          />
         ))}
       </View>
-    </View>
-  );
-};
+    );
+  },
+);
 
-const EmptySearchState: React.FC<{ query: string }> = ({ query }) => {
+const EmptySearchState = React.memo(({ query }: { query: string }) => {
   const theme = useTheme();
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      tension: 50,
+      friction: 7,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   return (
-    <View style={styles.emptyState}>
+    <Animated.View
+      style={[styles.emptyState, { transform: [{ scale: scaleAnim }] }]}
+    >
       <IconButton
         icon="magnify"
         size={64}
         iconColor={theme.colors.onSurfaceVariant}
         style={styles.emptyIcon}
       />
-      <Text variant="titleLarge" style={styles.emptyTitle}>
-        No results found
+      <Text variant="titleMedium" style={styles.emptyTitle}>
+        No results for "{query}"
       </Text>
       <Text
         variant="bodyMedium"
@@ -160,9 +202,9 @@ const EmptySearchState: React.FC<{ query: string }> = ({ query }) => {
       >
         Try searching with different keywords
       </Text>
-    </View>
+    </Animated.View>
   );
-};
+});
 
 const SearchScreen: React.FC<SearchScreenProps> = ({
   onAlbumPress,
@@ -171,158 +213,50 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
   onBack,
 }) => {
   const theme = useTheme();
-  const { playSong, currentSong } = usePlayer();
+
+
+  const { playSong } = usePlayerActions();
+  const currentSong = useCurrentSong();
+
   const insets = useSafeAreaInsets();
   const bottomPadding = getScreenPaddingBottom(true, true) + insets.bottom;
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<SearchTab>("all");
-  const [results, setResults] = useState<SearchResults>({
-    songs: [],
-    albums: [],
-    artists: [],
-    playlists: [],
-  });
-  const [loadingStates, setLoadingStates] = useState<LoadingStates>({
-    songs: false,
-    albums: false,
-    artists: false,
-    playlists: false,
-  });
-  const [error, setError] = useState<string | null>(null);
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const {
+    searchQuery,
+    setSearchQuery,
+    activeTab,
+    setActiveTab,
+    results,
+    loadingStates,
+    error,
+    recentSearches,
+    loadRecentSearches,
+    removeRecentSearch,
+    clearRecentSearches,
+    executeSearch,
+    clearSearchResults,
+    cancelSearch,
+  } = useSearchStore();
+
+  const [isVoiceModalVisible, setIsVoiceModalVisible] = useState(false);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scrollY = useRef(new Animated.Value(0)).current;
+
 
   useEffect(() => {
     loadRecentSearches();
-  }, []);
+  }, [loadRecentSearches]);
 
-  const loadRecentSearches = async () => {
-    const searches = await storageService.getRecentSearches();
-    setRecentSearches(searches);
-  };
 
-  const searchCategory = async (
-    query: string,
-    category: keyof SearchResults,
-    signal: AbortSignal,
-  ) => {
-    try {
-      setLoadingStates((prev) => ({ ...prev, [category]: true }));
-
-      let result;
-      const limit = 50;
-
-      switch (category) {
-        case "songs":
-          result = await Song.search({ query, limit });
-          break;
-        case "albums":
-          result = await Album.search({ query, limit });
-          break;
-        case "artists":
-          result = await Artist.search({ query, limit });
-          break;
-        case "playlists":
-          result = await Playlist.search({ query, limit });
-          break;
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
       }
+      cancelSearch();
+    };
+  }, [cancelSearch]);
 
-      if (!signal.aborted) {
-        setResults((prev) => ({ ...prev, [category]: result.results }));
-      }
-    } catch (err) {
-      if (!signal.aborted) {
-        console.error(`Error searching ${category}:`, err);
-      }
-    } finally {
-      if (!signal.aborted) {
-        setLoadingStates((prev) => ({ ...prev, [category]: false }));
-      }
-    }
-  };
-
-  const performSearch = useCallback(async (query: string, tab: SearchTab) => {
-    const trimmedQuery = query.trim();
-    if (!trimmedQuery) return;
-
-    // Save to recent searches
-    if (trimmedQuery) {
-      const result = await handleAsync(
-        async () => await storageService.addRecentSearch(trimmedQuery),
-        "Failed to save recent search",
-      );
-      if (result.success) {
-        await loadRecentSearches();
-      }
-    }
-
-    // Cancel previous search
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-
-    try {
-      setError(null);
-      setResults({ songs: [], albums: [], artists: [], playlists: [] });
-
-      if (tab === "all") {
-        setLoadingStates({
-          songs: true,
-          albums: true,
-          artists: true,
-          playlists: true,
-        });
-
-        const searchResult = await handleAsync(
-          async () => await Extras.searchAll({ query: trimmedQuery }),
-          "Search failed",
-        );
-
-        if (searchResult.success && searchResult.data) {
-          const result = searchResult.data;
-          if (!abortController.signal.aborted) {
-            setResults({
-              songs: (result.songs?.data as Models.Song[]) || [],
-              albums: (result.albums?.data as Models.Album[]) || [],
-              artists: (result.artists?.data as Models.Artist[]) || [],
-              playlists: (result.playlists?.data as Models.Playlist[]) || [],
-            });
-          }
-        } else if (!abortController.signal.aborted) {
-          setError(searchResult.error || "Search failed");
-          logError("SearchScreen.performSearch", searchResult.error);
-        }
-
-        if (!abortController.signal.aborted) {
-          setLoadingStates({
-            songs: false,
-            albums: false,
-            artists: false,
-            playlists: false,
-          });
-        }
-      } else {
-        await searchCategory(
-          trimmedQuery,
-          tab as keyof SearchResults,
-          abortController.signal,
-        );
-      }
-    } catch (err) {
-      if (!abortController.signal.aborted) {
-        logError("SearchScreen.performSearch", err);
-        setError("Failed to perform search. Please try again.");
-      }
-    }
-  }, []);
 
   useEffect(() => {
     if (debounceTimerRef.current) {
@@ -331,22 +265,13 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
 
     const trimmedQuery = searchQuery.trim();
 
-    if (trimmedQuery.length >= 2) {
+    if (trimmedQuery.length >= MIN_SEARCH_LENGTH) {
       debounceTimerRef.current = setTimeout(() => {
-        performSearch(trimmedQuery, activeTab);
+        executeSearch(trimmedQuery, activeTab);
       }, UI_CONFIG.SEARCH_DEBOUNCE);
     } else {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      setResults({ songs: [], albums: [], artists: [], playlists: [] });
-      setLoadingStates({
-        songs: false,
-        albums: false,
-        artists: false,
-        playlists: false,
-      });
-      setError(null);
+      cancelSearch();
+      clearSearchResults();
     }
 
     return () => {
@@ -354,156 +279,173 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [searchQuery, activeTab, performSearch]);
+  }, [searchQuery, activeTab, executeSearch, clearSearchResults, cancelSearch]);
 
-  useEffect(() => {
-    const trimmedQuery = searchQuery.trim();
-    if (trimmedQuery.length >= 2) {
-      performSearch(trimmedQuery, activeTab);
-    }
-  }, [activeTab]);
+  const handleVoiceResult = useCallback(
+    (text: string) => {
+      setSearchQuery(text);
+      executeSearch(text, null);
+      setIsVoiceModalVisible(false);
+    },
+    [executeSearch, setSearchQuery],
+  );
 
   const handleTrackPress = useCallback(
     (track: Models.Song) => {
       playSong(track);
     },
-    [results.songs, playSong],
+    [playSong],
   );
-
-  const handleRemoveRecentSearch = useCallback(async (search: string) => {
-    setRecentSearches((prev) => prev.filter((s) => s !== search));
-  }, []);
 
   const handleClearRecentSearches = useCallback(async () => {
-    await storageService.clearRecentSearches();
-    setRecentSearches([]);
-  }, []);
+    await clearRecentSearches();
+  }, [clearRecentSearches]);
 
-  const handleRecentSearchSelect = useCallback((search: string) => {
-    setSearchQuery(search);
-  }, []);
-
-  const renderSectionHeader = (title: string, count: number) => (
-    <View style={styles.sectionHeaderContainer}>
-      <Text variant="titleLarge" style={styles.sectionHeaderText}>
-        {title}
-      </Text>
-      {count > 5 && (
-        <Text
-          variant="bodySmall"
-          style={[
-            styles.sectionCount,
-            { color: theme.colors.onSurfaceVariant },
-          ]}
-        >
-          {count} results
-        </Text>
-      )}
-    </View>
+  const handleRecentSearchSelect = useCallback(
+    (search: string) => {
+      setSearchQuery(search);
+    },
+    [setSearchQuery],
   );
 
-  const renderSongsList = (songs: Models.Song[], isLoading: boolean) => {
-    if (isLoading) return <SkeletonList count={3} />;
-    if (songs.length === 0) return null;
+  const handleRemoveRecentSearch = useCallback(
+    async (search: string) => {
+      await removeRecentSearch(search);
+    },
+    [removeRecentSearch],
+  );
 
-    return (
-      <View style={styles.section}>
-        {renderSectionHeader("Songs", songs.length)}
-        {songs
-          .slice(0, activeTab === "songs" ? songs.length : 5)
-          .map((song) => (
+  const renderSectionHeader = useCallback(
+    (title: string, count: number) => (
+      <View style={styles.sectionHeaderContainer}>
+        <Text variant="titleLarge" style={styles.sectionHeaderText}>
+          {title}
+        </Text>
+        {count > 5 && (
+          <Text
+            variant="bodySmall"
+            style={[
+              styles.sectionCount,
+              { color: theme.colors.onSurfaceVariant },
+            ]}
+          >
+            {count} results
+          </Text>
+        )}
+      </View>
+    ),
+    [theme],
+  );
+
+  const renderSongsList = useCallback(
+    (songs: Models.Song[], isLoading: boolean) => {
+      if (isLoading) return <SkeletonList count={3} />;
+      if (songs.length === 0) return null;
+
+      const displaySongs = activeTab === "songs" ? songs : songs.slice(0, 5);
+
+      return (
+        <View style={styles.section}>
+          {renderSectionHeader("Songs", songs.length)}
+          {displaySongs.map((item) => (
             <TrackItem
-              key={song.id}
-              track={song}
-              onPress={() => handleTrackPress(song)}
-              isActive={currentSong?.id === song.id}
+              key={item.id}
+              track={item}
+              onPress={() => handleTrackPress(item)}
+              isActive={currentSong?.id === item.id}
               showArtwork
             />
           ))}
-      </View>
-    );
-  };
+        </View>
+      );
+    },
+    [activeTab, currentSong, handleTrackPress, renderSectionHeader],
+  );
 
-  const renderAlbumsList = (albums: Models.Album[], isLoading: boolean) => {
-    if (isLoading) return <SkeletonList count={3} />;
-    if (albums.length === 0) return null;
+  const renderAlbumsList = useCallback(
+    (albums: Models.Album[], isLoading: boolean) => {
+      if (isLoading) return <SkeletonList count={3} />;
+      if (albums.length === 0) return null;
 
-    return (
-      <View style={styles.section}>
-        {renderSectionHeader("Albums", albums.length)}
-        {albums
-          .slice(0, activeTab === "albums" ? albums.length : 5)
-          .map((album) => (
+      const displayAlbums =
+        activeTab === "albums" ? albums : albums.slice(0, 5);
+
+      return (
+        <View style={styles.section}>
+          {renderSectionHeader("Albums", albums.length)}
+          {displayAlbums.map((item) => (
             <GenericMediaItem
-              key={album.id}
-              data={album}
+              key={item.id}
+              data={item}
               type="album"
-              onPress={() => onAlbumPress(album.id)}
+              onPress={() => onAlbumPress(item.id)}
             />
           ))}
-      </View>
-    );
-  };
+        </View>
+      );
+    },
+    [activeTab, onAlbumPress, renderSectionHeader],
+  );
 
-  const renderArtistsList = (artists: Models.Artist[], isLoading: boolean) => {
-    if (isLoading) return <SkeletonList count={3} />;
-    if (artists.length === 0) return null;
+  const renderArtistsList = useCallback(
+    (artists: Models.Artist[], isLoading: boolean) => {
+      if (isLoading) return <SkeletonList count={3} />;
+      if (artists.length === 0) return null;
 
-    return (
-      <View style={styles.section}>
-        {renderSectionHeader("Artists", artists.length)}
-        {artists
-          .slice(0, activeTab === "artists" ? artists.length : 5)
-          .map((artist) => (
+      const displayArtists =
+        activeTab === "artists" ? artists : artists.slice(0, 5);
+
+      return (
+        <View style={styles.section}>
+          {renderSectionHeader("Artists", artists.length)}
+          {displayArtists.map((item) => (
             <GenericMediaItem
-              key={artist.id}
-              data={artist}
+              key={item.id}
+              data={item}
               type="artist"
-              onPress={() => onArtistPress(artist.id)}
+              onPress={() => onArtistPress(item.id)}
             />
           ))}
-      </View>
-    );
-  };
+        </View>
+      );
+    },
+    [activeTab, onArtistPress, renderSectionHeader],
+  );
 
-  const renderPlaylistsList = (
-    playlists: Models.Playlist[],
-    isLoading: boolean,
-  ) => {
-    if (isLoading) return <SkeletonList count={3} />;
-    if (playlists.length === 0) return null;
+  const renderPlaylistsList = useCallback(
+    (playlists: Models.Playlist[], isLoading: boolean) => {
+      if (isLoading) return <SkeletonList count={3} />;
+      if (playlists.length === 0) return null;
 
-    return (
-      <View style={styles.section}>
-        {renderSectionHeader("Playlists", playlists.length)}
-        {playlists
-          .slice(0, activeTab === "playlists" ? playlists.length : 5)
-          .map((playlist) => (
+      const displayPlaylists =
+        activeTab === "playlists" ? playlists : playlists.slice(0, 5);
+
+      return (
+        <View style={styles.section}>
+          {renderSectionHeader("Playlists", playlists.length)}
+          {displayPlaylists.map((item) => (
             <GenericMediaItem
-              key={playlist.id}
-              data={playlist}
+              key={item.id}
+              data={item}
               type="playlist"
-              onPress={() => onPlaylistPress(playlist.id)}
+              onPress={() => onPlaylistPress(item.id)}
             />
           ))}
-      </View>
-    );
-  };
+        </View>
+      );
+    },
+    [activeTab, onPlaylistPress, renderSectionHeader],
+  );
 
-  const renderAllTab = () => {
+  const renderContent = () => {
+    const hasQuery = searchQuery.trim().length >= MIN_SEARCH_LENGTH;
     const hasAnyResults =
-      results.songs.length > 0 ||
-      results.albums.length > 0 ||
-      results.artists.length > 0 ||
-      results.playlists.length > 0;
+      results.songs?.length > 0 ||
+      results.albums?.length > 0 ||
+      results.artists?.length > 0 ||
+      results.playlists?.length > 0;
 
-    const isAnyLoading =
-      loadingStates.songs ||
-      loadingStates.albums ||
-      loadingStates.artists ||
-      loadingStates.playlists;
-
-    if (!searchQuery.trim()) {
+    if (!hasQuery && !hasAnyResults) {
       return (
         <RecentSearches
           searches={recentSearches}
@@ -514,21 +456,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
       );
     }
 
-    if (!hasAnyResults && !isAnyLoading) {
-      return <EmptySearchState query={searchQuery} />;
-    }
-
-    return (
-      <>
-        {renderSongsList(results.songs, loadingStates.songs)}
-        {renderAlbumsList(results.albums, loadingStates.albums)}
-        {renderArtistsList(results.artists, loadingStates.artists)}
-        {renderPlaylistsList(results.playlists, loadingStates.playlists)}
-      </>
-    );
-  };
-
-  const renderContent = () => {
     if (error) {
       return (
         <View style={styles.errorContainer}>
@@ -545,34 +472,59 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
       );
     }
 
-    switch (activeTab) {
-      case "songs":
-        return renderSongsList(results.songs, loadingStates.songs);
-      case "albums":
-        return renderAlbumsList(results.albums, loadingStates.albums);
-      case "artists":
-        return renderArtistsList(results.artists, loadingStates.artists);
-      case "playlists":
-        return renderPlaylistsList(results.playlists, loadingStates.playlists);
-      default:
-        return renderAllTab();
+    const isAnyLoading =
+      loadingStates.songs ||
+      loadingStates.albums ||
+      loadingStates.artists ||
+      loadingStates.playlists;
+
+    if (!hasAnyResults && !isAnyLoading && hasQuery) {
+      return <EmptySearchState query={searchQuery} />;
     }
+
+    if (activeTab === "songs") {
+      return renderSongsList(results.songs || [], loadingStates.songs);
+    }
+    if (activeTab === "albums") {
+      return renderAlbumsList(results.albums || [], loadingStates.albums);
+    }
+    if (activeTab === "artists") {
+      return renderArtistsList(results.artists || [], loadingStates.artists);
+    }
+    if (activeTab === "playlists") {
+      return renderPlaylistsList(
+        results.playlists || [],
+        loadingStates.playlists,
+      );
+    }
+
+    return (
+      <>
+        {renderSongsList(results.songs || [], loadingStates.songs)}
+        {renderAlbumsList(results.albums || [], loadingStates.albums)}
+        {renderArtistsList(results.artists || [], loadingStates.artists)}
+        {renderPlaylistsList(results.playlists || [], loadingStates.playlists)}
+      </>
+    );
   };
 
-  const tabs = [
-    { id: "all" as SearchTab, label: "All" },
-    { id: "songs" as SearchTab, label: "Songs" },
-    { id: "albums" as SearchTab, label: "Albums" },
-    { id: "artists" as SearchTab, label: "Artists" },
-    { id: "playlists" as SearchTab, label: "Playlists" },
-  ];
+  const tabs = useMemo(
+    () => [
+      { id: "songs" as SearchTab, label: "Songs" },
+      { id: "albums" as SearchTab, label: "Albums" },
+      { id: "artists" as SearchTab, label: "Artists" },
+      { id: "playlists" as SearchTab, label: "Playlists" },
+    ],
+    [],
+  );
+
+  const shouldShowTabs = searchQuery.trim().length >= MIN_SEARCH_LENGTH;
 
   return (
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
-      {/* Search Header */}
-      <View style={[styles.header]}>
+      <View style={styles.header}>
         {onBack && (
           <IconButton
             icon="arrow-left"
@@ -589,19 +541,33 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
           style={[
             styles.searchbar,
             onBack && styles.searchbarWithBack,
-            {
-              backgroundColor: theme.colors.surfaceVariant,
-            },
+            { backgroundColor: theme.colors.surfaceVariant },
           ]}
           inputStyle={styles.searchbarInput}
           iconColor={theme.colors.onSurfaceVariant}
           placeholderTextColor={theme.colors.onSurfaceVariant}
           elevation={0}
+          right={() =>
+            searchQuery ? (
+              <IconButton
+                icon="close"
+                size={20}
+                iconColor={theme.colors.onSurfaceVariant}
+                onPress={() => setSearchQuery("")}
+              />
+            ) : (
+              <IconButton
+                icon="microphone"
+                size={20}
+                iconColor={theme.colors.onSurfaceVariant}
+                onPress={() => setIsVoiceModalVisible(true)}
+              />
+            )
+          }
         />
       </View>
 
-      {/* Filter Tabs */}
-      {searchQuery.trim().length >= 2 && (
+      {shouldShowTabs && (
         <View style={styles.tabsWrapper}>
           <ScrollView
             horizontal
@@ -611,7 +577,9 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
             {tabs.map((tab) => (
               <TouchableOpacity
                 key={tab.id}
-                onPress={() => setActiveTab(tab.id)}
+                onPress={() =>
+                  setActiveTab(activeTab === tab.id ? null : tab.id)
+                }
                 style={[
                   styles.tab,
                   activeTab === tab.id && {
@@ -640,32 +608,29 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
         </View>
       )}
 
-      {/* Results */}
-      <Animated.ScrollView
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: bottomPadding },
         ]}
         showsVerticalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true },
-        )}
-        scrollEventThrottle={16}
+        keyboardShouldPersistTaps="handled"
       >
         {renderContent()}
-      </Animated.ScrollView>
+      </ScrollView>
+
+      <VoiceSearchModal
+        visible={isVoiceModalVisible}
+        onClose={() => setIsVoiceModalVisible(false)}
+        onResult={handleVoiceResult}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#121212",
-  },
-
+  container: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -674,31 +639,12 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     gap: 8,
   },
-  backButton: {
-    margin: 0,
-  },
-  searchbar: {
-    flex: 1,
-    borderRadius: 8,
-    elevation: 0,
-  },
-  searchbarInput: {
-    fontSize: 15,
-    minHeight: 0,
-    paddingVertical: 0,
-  },
-  searchbarWithBack: {
-    flex: 1,
-  },
-
-  tabsWrapper: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  tabsContent: {
-    gap: 8,
-    paddingRight: 16,
-  },
+  backButton: { margin: 0 },
+  searchbar: { flex: 1, borderRadius: 8, elevation: 0 },
+  searchbarInput: { fontSize: 15, minHeight: 0, paddingVertical: 0 },
+  searchbarWithBack: { flex: 1 },
+  tabsWrapper: { paddingHorizontal: 16, paddingBottom: 16 },
+  tabsContent: { gap: 8, paddingRight: 16 },
   tab: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -707,65 +653,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.1)",
   },
-  tabLabel: {
-    fontWeight: "600",
-    letterSpacing: 0.25,
-  },
-
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 0,
-  },
-
-  recentSection: {
-    paddingTop: 8,
-  },
+  tabLabel: { fontWeight: "600", letterSpacing: 0.25 },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 0 },
+  recentSection: { paddingTop: 8 },
   recentHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  recentTitle: {
-    fontWeight: "700",
-  },
-  clearText: {
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  recentList: {
-    paddingHorizontal: 8,
-  },
+  recentTitle: { fontWeight: "700" },
+  clearText: { fontWeight: "600", fontSize: 14 },
   recentItem: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: 12,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    marginHorizontal: 8,
   },
-  recentItemLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  recentIcon: {
-    margin: 0,
-    marginRight: 4,
-  },
-  recentSearchText: {
-    flex: 1,
-  },
-  removeIcon: {
-    margin: 0,
-  },
-
-  section: {
-    marginBottom: 32,
-  },
+  recentIcon: { margin: 0, marginRight: 8 },
+  recentSearchText: { flex: 1 },
+  removeIcon: { margin: 0, marginLeft: 4 },
+  section: { marginBottom: 32 },
   sectionHeaderContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -773,15 +684,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 12,
   },
-  sectionHeaderText: {
-    fontWeight: "700",
-    fontSize: 22,
-  },
-  sectionCount: {
-    fontSize: 12,
-    fontWeight: "500",
-  },
-
+  sectionHeaderText: { fontWeight: "700", fontSize: 20 },
+  sectionCount: { fontSize: 12, fontWeight: "500" },
   emptyState: {
     flex: 1,
     justifyContent: "center",
@@ -789,21 +693,9 @@ const styles = StyleSheet.create({
     paddingTop: 120,
     paddingHorizontal: 32,
   },
-  emptyIcon: {
-    margin: 0,
-    marginBottom: 16,
-    opacity: 0.3,
-  },
-  emptyTitle: {
-    fontWeight: "700",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  emptySubtitle: {
-    textAlign: "center",
-    opacity: 0.7,
-  },
-
+  emptyIcon: { margin: 0, marginBottom: 16, opacity: 0.3 },
+  emptyTitle: { fontWeight: "600", marginBottom: 8, textAlign: "center" },
+  emptySubtitle: { textAlign: "center", opacity: 0.7 },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
@@ -811,16 +703,8 @@ const styles = StyleSheet.create({
     paddingTop: 120,
     paddingHorizontal: 32,
   },
-  errorIcon: {
-    margin: 0,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: "#ef4444",
-    textAlign: "center",
-    fontWeight: "600",
-  },
-
+  errorIcon: { margin: 0, marginBottom: 16 },
+  errorText: { color: "#ef4444", textAlign: "center", fontWeight: "600" },
   skeletonItem: {
     flexDirection: "row",
     paddingVertical: 8,
@@ -833,10 +717,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
   },
-  skeletonContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
+  skeletonContent: { flex: 1, marginLeft: 12 },
   skeletonTitle: {
     height: 16,
     backgroundColor: "rgba(255, 255, 255, 0.1)",

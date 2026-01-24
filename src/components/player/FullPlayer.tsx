@@ -1,26 +1,34 @@
+import { useLibraryStore } from "@/stores/libraryStore";
+import {
+    useCurrentSong,
+    useDominantColor,
+    useDuration,
+    usePlaybackControls,
+    usePlaybackStatus,
+    usePlayerActions,
+    useProgress,
+    useQueue,
+    useSetDominantColor,
+} from "@/stores/playerStore";
+import { createColorGradient, extractAndUpdateColor } from "@/utils/colorUtils";
+import { formatShareMessage, formatTime } from "@/utils/formatters";
 import { MaterialIcons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import { Models } from "@saavn-labs/sdk";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Animated,
-  Dimensions,
-  FlatList,
-  Modal,
-  Share,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Animated,
+    Dimensions,
+    FlatList,
+    Modal,
+    Share,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { Text } from "react-native-paper";
-import { usePlayer } from "../../contexts/PlayerContext";
-import { storageService } from "../../services/StorageService";
-import {
-  createColorGradient,
-  extractDominantColor,
-} from "../../utils/colorUtils";
 import TrackItem from "../items/TrackItem";
 
 const { width } = Dimensions.get("window");
@@ -31,13 +39,18 @@ interface FullPlayerProps {
 }
 
 const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
+  const currentSong = useCurrentSong();
+  const status = usePlaybackStatus();
+  const progress = useProgress();
+  const duration = useDuration();
+  const { isShuffled, repeatMode } = usePlaybackControls();
+  const { queue, currentIndex } = useQueue();
+  const dominantColor = useDominantColor();
+  const setDominantColor = useSetDominantColor();
+  const { isFavorite, toggleFavorite: toggleFavoriteInStore } =
+    useLibraryStore();
+
   const {
-    currentSong,
-    status,
-    progress,
-    duration,
-    isShuffled,
-    repeatMode,
     togglePlayPause,
     playSong,
     playNext,
@@ -45,16 +58,15 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
     seekTo,
     toggleShuffle,
     toggleRepeatMode,
-    getUpNext,
-  } = usePlayer();
+  } = usePlayerActions();
 
   const [seekValue, setSeekValue] = useState(progress);
   const [isDragging, setIsDragging] = useState(false);
-  const [isFavorited, setIsFavorited] = useState(false);
-  const [dominantColor, setDominantColor] = useState("#1a1a1a");
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
+
+  const upNextTracks = queue.slice(currentIndex + 1);
 
   useEffect(() => {
     if (visible) {
@@ -80,11 +92,9 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
 
   useEffect(() => {
     if (currentSong?.images?.[0]?.url) {
-      extractDominantColor(currentSong.images[0].url).then(({ color }) => {
-        setDominantColor(color);
-      });
+      extractAndUpdateColor(currentSong.images[0].url, setDominantColor);
     }
-  }, [currentSong?.id]);
+  }, [currentSong?.id, setDominantColor]);
 
   useEffect(() => {
     if (!isDragging) {
@@ -92,89 +102,65 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
     }
   }, [progress, isDragging]);
 
-  useEffect(() => {
-    if (currentSong) {
-      storageService.isFavorite(currentSong.id).then(setIsFavorited);
-    }
-  }, [currentSong?.id]);
-
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const getRepeatIcon = () => {
+  const getRepeatIcon = useCallback(() => {
     return repeatMode ? "repeat-one-on" : "repeat";
-  };
+  }, [repeatMode]);
 
-  const handleSeekStart = () => {
+  const handleSeekStart = useCallback(() => {
     setIsDragging(true);
-  };
+  }, []);
 
-  const handleSeekChange = (value: number) => {
-    setSeekValue(value);
-  };
+  const handleSeekChange = useCallback(
+    (value: number) => {
+      if (isDragging) {
+        setSeekValue(value);
+      }
+    },
+    [isDragging],
+  );
 
-  const handleSeekComplete = (value: number) => {
-    setIsDragging(false);
-    seekTo(value);
-  };
+  const handleSeekComplete = useCallback(
+    (value: number) => {
+      seekTo(value);
+      setSeekValue(value);
+      setTimeout(() => setIsDragging(false), 100);
+    },
+    [seekTo],
+  );
 
-  const toggleFavorite = async () => {
+  const handleToggleFavorite = useCallback(async () => {
     if (!currentSong) return;
+    await toggleFavoriteInStore(currentSong);
+  }, [currentSong, toggleFavoriteInStore]);
 
-    if (isFavorited) {
-      await storageService.removeFavorite(currentSong.id);
-      setIsFavorited(false);
-    } else {
-      await storageService.addFavorite(currentSong);
-      setIsFavorited(true);
-    }
-  };
-
-  const handleShare = async () => {
+  const handleShare = useCallback(async () => {
     if (!currentSong) return;
     try {
-      const shareUrl =
-        (currentSong as Models.Song).url ||
-        `https://www.jiosaavn.com/song/${currentSong.id}`;
-      const artistsText =
-        currentSong.artists?.primary?.map((a) => a.name).join(", ") ||
-        currentSong.subtitle ||
-        "";
-      const message = `Check out "${currentSong.title}" by ${artistsText} on JioSaavn`;
-
-      await Share.share({
-        message: `${message}\n${shareUrl}`,
-        url: shareUrl,
-        title: currentSong.title,
-      });
+      const shareData = formatShareMessage(currentSong);
+      await Share.share(shareData);
     } catch (error) {
       console.error("Error sharing from FullPlayer:", error);
     }
-  };
+  }, [currentSong]);
 
   const gradient = createColorGradient(dominantColor);
 
-  const upNextTracks = getUpNext();
+  const handleTrackPress = useCallback(
+    async (track: Models.Song) => {
+      await playSong(track);
+    },
+    [playSong],
+  );
 
-  const handleTrackPress = async (track: Models.Song, index: number) => {
-    await playSong(track, upNextTracks, index);
-  };
-
-  const renderUpNextItem = ({
-    item,
-    index,
-  }: {
-    item: Models.Song;
-    index: number;
-  }) => (
-    <TrackItem
-      track={item}
-      onPress={() => handleTrackPress(item, index)}
-      isActive={false}
-    />
+  const renderUpNextItem = useCallback(
+    ({ item }: { item: Models.Song }) => (
+      <TrackItem
+        track={item}
+        onPress={() => handleTrackPress(item)}
+        isActive={false}
+      />
+    ),
+    [handleTrackPress],
   );
 
   if (!currentSong) return null;
@@ -210,8 +196,7 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* Header */}
-            <View style={[styles.header]}>
+            <View style={styles.header}>
               <TouchableOpacity
                 onPress={onClose}
                 style={styles.headerButton}
@@ -237,7 +222,6 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
               </TouchableOpacity>
             </View>
 
-            {/* Album Art */}
             <View style={styles.artworkContainer}>
               <View style={styles.artworkShadow}>
                 <Image
@@ -252,7 +236,6 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
               </View>
             </View>
 
-            {/* Song Info */}
             <View style={styles.infoContainer}>
               <View style={styles.songInfo}>
                 <Text
@@ -271,19 +254,20 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
                 </Text>
               </View>
               <TouchableOpacity
-                onPress={toggleFavorite}
+                onPress={handleToggleFavorite}
                 style={styles.favoriteButton}
                 activeOpacity={0.7}
               >
                 <MaterialIcons
-                  name={isFavorited ? "favorite" : "favorite-border"}
+                  name={
+                    isFavorite(currentSong.id) ? "favorite" : "favorite-border"
+                  }
                   size={28}
-                  color={isFavorited ? "#1db954" : "#ffffff"}
+                  color={isFavorite(currentSong.id) ? "#1db954" : "#ffffff"}
                 />
               </TouchableOpacity>
             </View>
 
-            {/* Progress Bar */}
             <View style={styles.progressContainer}>
               <Slider
                 style={styles.slider}
@@ -299,7 +283,7 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
               />
               <View style={styles.timeContainer}>
                 <Text variant="bodySmall" style={styles.timeText}>
-                  {formatTime(progress)}
+                  {formatTime(isDragging ? seekValue : progress)}
                 </Text>
                 <Text variant="bodySmall" style={styles.timeText}>
                   {formatTime(duration)}
@@ -307,7 +291,6 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
               </View>
             </View>
 
-            {/* Playback Controls */}
             <View style={styles.controlsContainer}>
               <TouchableOpacity
                 onPress={toggleShuffle}
@@ -363,7 +346,6 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
               </TouchableOpacity>
             </View>
 
-            {/* Up Next */}
             {upNextTracks.length > 0 && (
               <View style={styles.upNextContainer}>
                 <Text style={styles.upNextHeader}>Up Next</Text>
@@ -397,7 +379,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 40,
   },
-
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -423,7 +404,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     fontSize: 11,
   },
-
   artworkContainer: {
     alignItems: "center",
     marginTop: 32,
@@ -442,7 +422,6 @@ const styles = StyleSheet.create({
     height: width - 48,
     borderRadius: 8,
   },
-
   infoContainer: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -472,7 +451,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   progressContainer: {
     paddingHorizontal: 24,
     marginBottom: 20,
@@ -491,7 +469,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
   },
-
   controlsContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -525,21 +502,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-  },
-
-  additionalControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    marginBottom: 24,
-    gap: 32,
-  },
-  additionalButton: {
-    width: 44,
-    height: 44,
-    justifyContent: "center",
-    alignItems: "center",
   },
   bottomSpacer: {
     height: 40,

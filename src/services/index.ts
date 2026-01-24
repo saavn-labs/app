@@ -1,8 +1,8 @@
-export * from "./AudioService";
 export * from "./CollectionService";
 export * from "./HistoryService";
-export * from "./MediaSessionService";
+export * from "./HomeService";
 export * from "./PlayerService";
-export * from "./PlayerStateService";
 export * from "./QueueService";
+export * from "./SearchService";
 export * from "./StorageService";
+

@@ -28,13 +28,6 @@
     "plugins": [
       "expo-router",
       [
-        "expo-media-control",
-        {
-          "enableBackgroundAudio": true,
-          "audioSessionCategory": "playback"
-        }
-      ],
-      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
@@ -46,7 +39,19 @@
           }
         }
       ],
-      ["expo-audio"]
+      [
+        "expo-navigation-bar",
+        {
+          "backgroundColor": "#000000",
+          "barStyle": "dark",
+          "borderColor": "#000000",
+          "visibility": "visible",
+          "behavior": "inset-swipe",
+          "position": "relative"
+        }
+      ],
+      "expo-audio",
+      "expo-speech-recognition"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,11 +1,12 @@
 import TrackItem from "@/components/items/TrackItem";
-import { usePlayer } from "@/contexts/PlayerContext";
-import { HistoryEntry, historyService } from "@/services/HistoryService";
+import { HistoryEntry, HistorySection } from "@/services/HistoryService";
+import { useHistoryStore } from "@/stores/historyStore";
+import { usePlayerStore } from "@/stores/playerStore";
 import { getScreenPaddingBottom } from "@/utils/designSystem";
-import { handleAsync, logError } from "@/utils/errorHandler";
+import { handleAsync } from "@/utils/errorHandler";
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   Alert,
   Animated,
@@ -19,66 +20,27 @@ import { Text, useTheme } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const AnimatedSectionList = Animated.createAnimatedComponent(
-  SectionList<HistoryEntry, HistorySection>,
+  SectionList<HistoryEntry, { title: string; data: HistoryEntry[] }>,
 );
-
-interface HistorySection {
-  title: string;
-  data: HistoryEntry[];
-}
 
 export default function HistoryScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const bottomPadding = getScreenPaddingBottom(true, true) + insets.bottom;
-  const [sections, setSections] = useState<HistorySection[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { playSong, currentSong } = usePlayer();
+  const { playSong, currentSong } = usePlayerStore();
+  const {
+    sections,
+    loading,
+    loadHistory,
+    removeHistoryEntry,
+    clearHistory: clearHistoryStore,
+  } = useHistoryStore();
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadHistory();
   }, []);
-
-  const groupHistoryByDate = (history: HistoryEntry[]): HistorySection[] => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const todaysEntries = history.filter((entry) => {
-      const playedAt = new Date(entry.playedAt);
-      playedAt.setHours(0, 0, 0, 0);
-      return playedAt.getTime() === today.getTime();
-    });
-
-    if (todaysEntries.length === 0) return [];
-
-    return [
-      {
-        title: "Today",
-        data: todaysEntries,
-      },
-    ];
-  };
-
-  const loadHistory = async () => {
-    setLoading(true);
-
-    const result = await handleAsync(async () => {
-      const data = await historyService.getHistory();
-      const groupedSections = groupHistoryByDate(data);
-      return groupedSections;
-    }, "Failed to load history");
-
-    if (result.success && result.data) {
-      setSections(result.data);
-    } else {
-      logError("HistoryScreen.loadHistory", result.error);
-      setSections([]);
-    }
-
-    setLoading(false);
-  };
 
   const handlePlaySong = async (entry: HistoryEntry) => {
     const result = await handleAsync(
@@ -88,18 +50,21 @@ export default function HistoryScreen() {
 
     if (!result.success) {
       Alert.alert("Error", result.error || "Failed to play song");
-      logError("HistoryScreen.handlePlaySong", result.error);
+      if (__DEV__) {
+        console.error("[HistoryScreen.handlePlaySong]", result.error);
+      }
     }
   };
 
   const handleRemoveFromHistory = async (songId: string) => {
     const result = await handleAsync(async () => {
-      await historyService.removeFromHistory(songId);
-      await loadHistory();
+      await removeHistoryEntry(songId);
     }, "Failed to remove from history");
 
     if (!result.success) {
-      logError("HistoryScreen.handleRemoveFromHistory", result.error);
+      if (__DEV__) {
+        console.error("[HistoryScreen.handleRemoveFromHistory]", result.error);
+      }
     }
   };
 
@@ -114,13 +79,17 @@ export default function HistoryScreen() {
           style: "destructive",
           onPress: async () => {
             const result = await handleAsync(async () => {
-              await historyService.clearHistory();
-              await loadHistory();
+              await clearHistoryStore();
             }, "Failed to clear history");
 
             if (!result.success) {
               Alert.alert("Error", result.error || "Failed to clear history");
-              logError("HistoryScreen.handleClearHistory", result.error);
+              if (__DEV__) {
+                console.error(
+                  "[HistoryScreen.handleClearHistory]",
+                  result.error,
+                );
+              }
             }
           },
         },
