@@ -68,19 +68,6 @@ react {
  */
 def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBuilds') ?: false).toBoolean()
 
-/**
- * The preferred build flavor of JavaScriptCore (JSC)
- *
- * For example, to use the international variant, you can use:
- * `def jscFlavor = 'org.webkit:android-jsc-intl:+'`
- *
- * The international variant includes ICU i18n library and necessary data
- * allowing to use e.g. `Date.toLocaleString` and `String.localeCompare` that
- * give correct results when using with locales other than en-US. Note that
- * this variant is about 6MiB larger per architecture than default.
- */
-def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
-
 android {
     ndkVersion rootProject.ext.ndkVersion
 
@@ -104,22 +91,31 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            storeFile file(SAAVNMUSIC_UPLOAD_STORE_FILE)
+            storePassword SAAVNMUSIC_UPLOAD_STORE_PASSWORD
+            keyAlias SAAVNMUSIC_UPLOAD_KEY_ALIAS
+            keyPassword SAAVNMUSIC_UPLOAD_KEY_PASSWORD
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
-            def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
-            shrinkResources enableShrinkResources.toBoolean()
-            minifyEnabled enableMinifyInReleaseBuilds
-            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
-            def enablePngCrunchInRelease = findProperty('android.enablePngCrunchInReleaseBuilds') ?: 'true'
-            crunchPngs enablePngCrunchInRelease.toBoolean()
+            signingConfig signingConfigs.release
+
+            shrinkResources true
+            minifyEnabled true
+
+            proguardFiles(
+                "${android.sdkDirectory}/tools/proguard/proguard-android-optimize.txt",
+                "proguard-rules.pro"
+            )
+
+            crunchPngs true
         }
+
     }
     packagingOptions {
         jniLibs {
@@ -137,6 +133,15 @@ android {
     kotlinOptions {
         jvmTarget = '17'
     }
+    splits {
+        abi {
+            enable true
+            reset()
+            include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            universalApk true
+        }
+    }
+
     
     // Configure JVM toolchain to ensure consistency
     java {
@@ -188,9 +193,5 @@ dependencies {
         }
     }
 
-    if (hermesEnabled.toBoolean()) {
-        implementation("com.facebook.react:hermes-android")
-    } else {
-        implementation jscFlavor
-    }
+    implementation("com.facebook.react:hermes-android")
 }

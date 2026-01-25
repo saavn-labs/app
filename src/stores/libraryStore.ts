@@ -1,5 +1,4 @@
-import { Collection, collectionService } from "@/services/CollectionService";
-import { storageService } from "@/services/StorageService";
+import { Collection, collectionService, storageService } from "@/services";
 import { Models } from "@saavn-labs/sdk";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";

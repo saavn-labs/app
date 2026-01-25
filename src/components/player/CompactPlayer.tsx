@@ -1,5 +1,15 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import {
+  useCurrentSong,
+  useDominantColor,
+  useDuration,
+  usePlaybackStatus,
+  usePlayerActions,
+  useProgress,
+  useSetDominantColor,
+} from "@/stores/playerStore";
+import { createColorGradient, extractAndUpdateColor } from "@/utils/colorUtils";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect } from "react";
 import {
@@ -11,19 +21,6 @@ import {
 } from "react-native";
 import { Text } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  useCurrentSong,
-  useDominantColor,
-  useDuration,
-  usePlaybackStatus,
-  usePlayerActions,
-  useProgress,
-  useSetDominantColor,
-} from "../../stores/playerStore";
-import {
-  createColorGradient,
-  extractAndUpdateColor,
-} from "../../utils/colorUtils";
 
 interface CompactPlayerProps {
   onPress: () => void;
@@ -35,7 +32,7 @@ const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
   const status = usePlaybackStatus();
   const progress = useProgress();
   const duration = useDuration();
-  const { togglePlayPause, playNext } = usePlayerActions();
+  const { togglePlayPause, next } = usePlayerActions();
   const dominantColor = useDominantColor();
   const setDominantColor = useSetDominantColor();
   const insets = useSafeAreaInsets();
@@ -126,18 +123,18 @@ const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
               <MaterialIcons
                 name={status === "playing" ? "pause" : "play-arrow"}
                 size={28}
-                color="#FFF"
+                color="#ffffff"
               />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={(e) => {
                 e.stopPropagation();
-                playNext();
+                next();
               }}
               style={styles.nextButton}
               activeOpacity={0.8}
             >
-              <MaterialIcons name="skip-next" size={34} color="#FFF" />
+              <MaterialIcons name="skip-next" size={34} color="#ffffff" />
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -166,7 +163,7 @@ const styles = StyleSheet.create({
   },
   progressBarFill: {
     height: 2,
-    backgroundColor: "#FFF",
+    backgroundColor: "#ffffff",
   },
   content: {
     flexDirection: "row",
@@ -201,7 +198,7 @@ const styles = StyleSheet.create({
   title: {
     fontWeight: "700",
     marginBottom: 2,
-    color: "#FFF",
+    color: "#ffffff",
     fontSize: 14,
   },
   subtitle: {

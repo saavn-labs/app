@@ -16,7 +16,7 @@ try {
 
 export const extractDominantColor = async (
   imageUrl: string,
-  fallbackColor: string = DEFAULT_FALLBACK_COLOR
+  fallbackColor: string = DEFAULT_FALLBACK_COLOR,
 ): Promise<{ color: string }> => {
   if (!imageUrl) return { color: fallbackColor };
 
@@ -46,7 +46,7 @@ export const extractDominantColor = async (
 export const extractAndUpdateColor = async (
   imageUrl: string,
   onColorExtracted: ColorUpdateCallback,
-  fallbackColor: string = DEFAULT_FALLBACK_COLOR
+  fallbackColor: string = DEFAULT_FALLBACK_COLOR,
 ): Promise<void> => {
   const { color } = await extractDominantColor(imageUrl, fallbackColor);
   onColorExtracted(color);
@@ -55,10 +55,13 @@ export const extractAndUpdateColor = async (
 export const createColorGradient = (
   baseColor: string,
   opacity1: number = 0.95,
-  opacity2: number = 0.95
+  opacity2: number = 0.95,
 ): [string, string, string] => {
   const toHex = (opacity: number) =>
-    Math.round(opacity * 255).toString(16).padStart(2, "0").toUpperCase();
+    Math.round(opacity * 255)
+      .toString(16)
+      .padStart(2, "0")
+      .toUpperCase();
 
   return [
     baseColor,

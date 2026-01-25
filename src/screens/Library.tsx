@@ -1,6 +1,6 @@
 import TrackItem from "@/components/items/TrackItem";
 import { COLORS } from "@/constants";
-import type { Collection } from "@/services/CollectionService";
+import type { Collection } from "@/services";
 import { useLibraryStore } from "@/stores/libraryStore";
 import { usePlayerStore } from "@/stores/playerStore";
 import { getScreenPaddingBottom } from "@/utils/designSystem";
@@ -50,7 +50,7 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const bottomPadding = getScreenPaddingBottom(true, true) + insets.bottom;
-  const { playSong, currentSong, shuffleAndPlay } = usePlayerStore();
+  const { playSong, currentSong } = usePlayerStore();
 
   const {
     favorites,
@@ -98,8 +98,8 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
   }, [loadLibraryData]);
 
   const handleTrackPress = useCallback(
-    (song: Models.Song, songs: Models.Song[], index: number) => {
-      playSong(song, songs, index);
+    (song: Models.Song, songs: Models.Song[]) => {
+      playSong(song, songs);
     },
     [playSong],
   );
@@ -107,19 +107,10 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
   const handlePlayAll = useCallback(
     (songs: Models.Song[]) => {
       if (songs.length > 0) {
-        playSong(songs[0], songs, 0);
+        playSong(songs[0], songs);
       }
     },
     [playSong],
-  );
-
-  const handleShuffle = useCallback(
-    (songs: Models.Song[]) => {
-      if (songs.length > 0) {
-        shuffleAndPlay(songs);
-      }
-    },
-    [shuffleAndPlay],
   );
 
   const handleCreateCollection = useCallback(async () => {
@@ -338,18 +329,6 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
           >
             <MaterialIcons name="play-arrow" size={32} color="#000000" />
           </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => handleShuffle(favorites)}
-            style={styles.actionButton}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons
-              name="shuffle"
-              size={24}
-              color={theme.colors.onSurface}
-            />
-          </TouchableOpacity>
         </View>
 
         <View style={styles.songsListContainer}>
@@ -359,7 +338,7 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
             renderItem={({ item, index }) => (
               <TrackItem
                 track={item}
-                onPress={() => handleTrackPress(item, favorites, index)}
+                onPress={() => handleTrackPress(item, favorites)}
                 isActive={currentSong?.id === item.id}
                 showArtwork
               />
@@ -374,7 +353,6 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
     theme.colors,
     currentSong,
     handlePlayAll,
-    handleShuffle,
     handleTrackPress,
     renderEmptyState,
   ]);
@@ -470,18 +448,6 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => handleShuffle(selectedCollection.songs)}
-                style={styles.actionButton}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons
-                  name="shuffle"
-                  size={24}
-                  color={theme.colors.onSurface}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
                 onPress={() => openRenameModal(selectedCollection)}
                 style={styles.actionButton}
                 activeOpacity={0.7}
@@ -514,7 +480,7 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
                   <TrackItem
                     track={item}
                     onPress={() =>
-                      handleTrackPress(item, selectedCollection.songs, index)
+                      handleTrackPress(item, selectedCollection.songs)
                     }
                     isActive={currentSong?.id === item.id}
                     showArtwork
@@ -535,7 +501,6 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
     getGradientForCollection,
     renderEmptyState,
     handlePlayAll,
-    handleShuffle,
     handleTrackPress,
     openRenameModal,
     handleDeleteCollection,

@@ -1,6 +1,5 @@
 import { AUDIO_QUALITY, UI_CONFIG } from "@/constants";
-import { homeService } from "@/services/HomeService";
-import { storageService } from "@/services/StorageService";
+import { homeService, storageService } from "@/services";
 import { Models } from "@saavn-labs/sdk";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";

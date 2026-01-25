@@ -1,26 +1,23 @@
 import { AUDIO_QUALITY, STORAGE_KEYS, UI_CONFIG } from "@/constants";
+import { appStorage } from "@/stores/storage";
 import { storageCache } from "@/utils/cache";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Models } from "@saavn-labs/sdk";
 
 type AudioQuality = keyof typeof AUDIO_QUALITY;
 
 /**
- * StorageService handles all AsyncStorage operations with caching
+ * StorageService handles all MMKV storage operations with caching
  * Manages favorites, recent searches, and user preferences
  */
 export class StorageService {
   async getFavorites(): Promise<Models.Song[]> {
     const cacheKey = STORAGE_KEYS.FAVORITES;
 
-
     const cached = storageCache.get(cacheKey);
     if (cached !== null) return cached;
 
-
-    const data = await AsyncStorage.getItem(cacheKey);
+    const data = await appStorage.getItem(cacheKey);
     const result = data ? JSON.parse(data) : [];
-
 
     storageCache.set(cacheKey, result);
 
@@ -50,14 +47,11 @@ export class StorageService {
   async getRecentSearches(): Promise<string[]> {
     const cacheKey = STORAGE_KEYS.RECENT_SEARCHES;
 
-
     const cached = storageCache.get(cacheKey);
     if (cached !== null) return cached;
 
-
-    const data = await AsyncStorage.getItem(cacheKey);
+    const data = await appStorage.getItem(cacheKey);
     const result = data ? JSON.parse(data) : [];
-
 
     storageCache.set(cacheKey, result);
 
@@ -76,7 +70,7 @@ export class StorageService {
   }
 
   async clearRecentSearches(): Promise<void> {
-    await AsyncStorage.removeItem(STORAGE_KEYS.RECENT_SEARCHES);
+    await appStorage.removeItem(STORAGE_KEYS.RECENT_SEARCHES);
     storageCache.delete(STORAGE_KEYS.RECENT_SEARCHES);
   }
 
@@ -87,26 +81,23 @@ export class StorageService {
   }
 
   async getContentQuality(): Promise<AudioQuality> {
-    const quality = await AsyncStorage.getItem(STORAGE_KEYS.CONTENT_QUALITY);
+    const quality = await appStorage.getItem(STORAGE_KEYS.CONTENT_QUALITY);
     return quality && quality in AUDIO_QUALITY
       ? (quality as AudioQuality)
       : "MEDIUM";
   }
 
   async saveContentQuality(quality: AudioQuality): Promise<void> {
-    await AsyncStorage.setItem(STORAGE_KEYS.CONTENT_QUALITY, quality);
+    await appStorage.setItem(STORAGE_KEYS.CONTENT_QUALITY, quality);
   }
 
   private async saveFavorites(favorites: Models.Song[]): Promise<void> {
-    await AsyncStorage.setItem(
-      STORAGE_KEYS.FAVORITES,
-      JSON.stringify(favorites),
-    );
+    await appStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(favorites));
     storageCache.set(STORAGE_KEYS.FAVORITES, favorites);
   }
 
   private async saveRecentSearches(searches: string[]): Promise<void> {
-    await AsyncStorage.setItem(
+    await appStorage.setItem(
       STORAGE_KEYS.RECENT_SEARCHES,
       JSON.stringify(searches),
     );

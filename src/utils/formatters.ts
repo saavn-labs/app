@@ -1,9 +1,13 @@
 import { Models } from "@saavn-labs/sdk";
 
 /**
- * Format seconds into MM:SS format
+ * Format time into MM:SS format
  */
-export function formatTime(seconds: number): string {
+export function formatTime(
+  time: number,
+  isMilliseconds: boolean = true,
+): string {
+  const seconds = isMilliseconds ? Math.floor(time / 1000) : time;
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, "0")}`;

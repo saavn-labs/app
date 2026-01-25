@@ -5,18 +5,18 @@ import { useSearchStore } from "@/stores/searchStore";
 import { getScreenPaddingBottom } from "@/utils/designSystem";
 import { Models } from "@saavn-labs/sdk";
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    Animated,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Animated,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { IconButton, Searchbar, Text, useTheme } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -214,13 +214,11 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
 }) => {
   const theme = useTheme();
 
-
   const { playSong } = usePlayerActions();
   const currentSong = useCurrentSong();
 
   const insets = useSafeAreaInsets();
   const bottomPadding = getScreenPaddingBottom(true, true) + insets.bottom;
-
 
   const {
     searchQuery,
@@ -241,12 +239,11 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
 
   const [isVoiceModalVisible, setIsVoiceModalVisible] = useState(false);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  const previousActiveTabRef = useRef<SearchTab | null>(activeTab);
 
   useEffect(() => {
     loadRecentSearches();
   }, [loadRecentSearches]);
-
 
   useEffect(() => {
     return () => {
@@ -257,6 +254,28 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
     };
   }, [cancelSearch]);
 
+  useEffect(() => {
+    const trimmedQuery = searchQuery.trim();
+    const hasQuery = trimmedQuery.length >= MIN_SEARCH_LENGTH;
+
+    if (!hasQuery || !activeTab) return;
+
+    const isCurrentTabLoading = loadingStates[activeTab];
+    if (isCurrentTabLoading) return;
+
+    const currentTabResults = results[activeTab] || [];
+    const hasCurrentTabResults = currentTabResults.length > 0;
+
+    if (!hasCurrentTabResults && activeTab !== "songs") {
+      const hasSongsResults = (results.songs || []).length > 0;
+      const isSongsLoading = loadingStates.songs;
+
+      if (hasSongsResults || !isSongsLoading) {
+        previousActiveTabRef.current = activeTab;
+        setActiveTab("songs");
+      }
+    }
+  }, [activeTab, results, loadingStates, searchQuery, setActiveTab]);
 
   useEffect(() => {
     if (debounceTimerRef.current) {
@@ -472,30 +491,31 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
       );
     }
 
-    const isAnyLoading =
-      loadingStates.songs ||
-      loadingStates.albums ||
-      loadingStates.artists ||
-      loadingStates.playlists;
+    const isAnyLoading = Object.values(loadingStates).some(
+      (loading) => loading,
+    );
 
     if (!hasAnyResults && !isAnyLoading && hasQuery) {
       return <EmptySearchState query={searchQuery} />;
     }
 
-    if (activeTab === "songs") {
-      return renderSongsList(results.songs || [], loadingStates.songs);
-    }
-    if (activeTab === "albums") {
-      return renderAlbumsList(results.albums || [], loadingStates.albums);
-    }
-    if (activeTab === "artists") {
-      return renderArtistsList(results.artists || [], loadingStates.artists);
-    }
-    if (activeTab === "playlists") {
-      return renderPlaylistsList(
-        results.playlists || [],
-        loadingStates.playlists,
-      );
+    if (activeTab) {
+      switch (activeTab) {
+        case "songs":
+          return renderSongsList(results.songs || [], loadingStates.songs);
+        case "albums":
+          return renderAlbumsList(results.albums || [], loadingStates.albums);
+        case "artists":
+          return renderArtistsList(
+            results.artists || [],
+            loadingStates.artists,
+          );
+        case "playlists":
+          return renderPlaylistsList(
+            results.playlists || [],
+            loadingStates.playlists,
+          );
+      }
     }
 
     return (
@@ -574,36 +594,47 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.tabsContent}
           >
-            {tabs.map((tab) => (
-              <TouchableOpacity
-                key={tab.id}
-                onPress={() =>
-                  setActiveTab(activeTab === tab.id ? null : tab.id)
-                }
-                style={[
-                  styles.tab,
-                  activeTab === tab.id && {
-                    backgroundColor: theme.colors.primary,
-                  },
-                ]}
-                activeOpacity={0.7}
-              >
-                <Text
-                  variant="labelLarge"
+            {tabs.map((tab) => {
+              const tabResults = results[tab.id] || [];
+              const hasTabResults = tabResults.length > 0;
+              const isTabLoading = loadingStates[tab.id];
+              const isTabActive = activeTab === tab.id;
+
+              return (
+                <TouchableOpacity
+                  key={tab.id}
+                  onPress={() => setActiveTab(isTabActive ? null : tab.id)}
                   style={[
-                    styles.tabLabel,
-                    {
-                      color:
-                        activeTab === tab.id
-                          ? "#000000"
-                          : theme.colors.onSurface,
+                    styles.tab,
+                    isTabActive && {
+                      backgroundColor: theme.colors.primary,
                     },
+                    !hasTabResults &&
+                      !isTabLoading &&
+                      !isTabActive &&
+                      styles.tabDisabled,
                   ]}
+                  activeOpacity={0.7}
+                  disabled={!hasTabResults && !isTabLoading && !isTabActive}
                 >
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    variant="labelLarge"
+                    style={[
+                      styles.tabLabel,
+                      {
+                        color: isTabActive ? "#000000" : theme.colors.onSurface,
+                      },
+                      !hasTabResults &&
+                        !isTabLoading &&
+                        !isTabActive &&
+                        styles.tabLabelDisabled,
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       )}
@@ -653,7 +684,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.1)",
   },
+  tabDisabled: {
+    opacity: 0.4,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+  },
   tabLabel: { fontWeight: "600", letterSpacing: 0.25 },
+  tabLabelDisabled: {
+    opacity: 0.5,
+  },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 0 },
   recentSection: { paddingTop: 8 },

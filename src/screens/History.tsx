@@ -1,5 +1,5 @@
 import TrackItem from "@/components/items/TrackItem";
-import { HistoryEntry, HistorySection } from "@/services/HistoryService";
+import { HistoryEntry, HistorySection } from "@/services";
 import { useHistoryStore } from "@/stores/historyStore";
 import { usePlayerStore } from "@/stores/playerStore";
 import { getScreenPaddingBottom } from "@/utils/designSystem";

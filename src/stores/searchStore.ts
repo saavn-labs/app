@@ -2,8 +2,8 @@ import {
   SearchCategory,
   SearchResults,
   searchService,
-} from "@/services/SearchService";
-import { storageService } from "@/services/StorageService";
+  storageService,
+} from "@/services";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { appStorage } from "./storage";

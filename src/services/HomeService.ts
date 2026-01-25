@@ -15,10 +15,8 @@ export class HomeService {
   async fetchHomeData(language: string): Promise<HomeData> {
     const cacheKey = `home_${language}`;
 
-
     const cached = storageCache.get(cacheKey);
     if (cached !== null) return cached;
-
 
     const [trendingAlbums, trendingPlaylists, trendingSongs] =
       await Promise.all([
@@ -28,7 +26,6 @@ export class HomeService {
       ]);
 
     const result = { trendingAlbums, trendingPlaylists, trendingSongs };
-
 
     storageCache.set(cacheKey, result);
 

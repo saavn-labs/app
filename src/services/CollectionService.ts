@@ -1,5 +1,5 @@
+import { appStorage } from "@/stores/storage";
 import { storageCache } from "@/utils/cache";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Models } from "@saavn-labs/sdk";
 
 const COLLECTIONS_KEY = "@collections";
@@ -22,14 +22,11 @@ export class CollectionService {
   async getCollections(): Promise<Collection[]> {
     const cacheKey = COLLECTIONS_KEY;
 
-
     const cached = storageCache.get(cacheKey);
     if (cached !== null) return cached;
 
-
-    const data = await AsyncStorage.getItem(COLLECTIONS_KEY);
+    const data = await appStorage.getItem(COLLECTIONS_KEY);
     const result = data ? JSON.parse(data) : [];
-
 
     storageCache.set(cacheKey, result);
 
@@ -207,7 +204,7 @@ export class CollectionService {
   }
 
   private async saveCollections(collections: Collection[]): Promise<void> {
-    await AsyncStorage.setItem(COLLECTIONS_KEY, JSON.stringify(collections));
+    await appStorage.setItem(COLLECTIONS_KEY, JSON.stringify(collections));
 
     storageCache.invalidatePattern(/^@collections/);
   }

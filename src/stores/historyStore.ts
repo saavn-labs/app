@@ -1,4 +1,4 @@
-import { HistorySection, historyService } from "@/services/HistoryService";
+import { HistorySection, historyService } from "@/services";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { appStorage } from "./storage";
@@ -27,7 +27,11 @@ export const useHistoryStore = create<HistoryState>()(
           set({ sections, loading: false });
           return true;
         } catch (error) {
-          set({ error: "Failed to load history", loading: false, sections: [] });
+          set({
+            error: "Failed to load history",
+            loading: false,
+            sections: [],
+          });
           console.error("[HistoryStore] loadHistory failed", error);
           return false;
         }
@@ -64,6 +68,6 @@ export const useHistoryStore = create<HistoryState>()(
       name: "history-storage",
       storage: createJSONStorage(() => appStorage),
       partialize: (state) => ({ sections: state.sections }),
-    }
-  )
+    },
+  ),
 );

@@ -7,23 +7,23 @@ import { Models } from "@saavn-labs/sdk";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import {
-    Animated,
-    Dimensions,
-    FlatList,
-    Image,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  FlatList,
+  Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    Chip,
-    IconButton,
-    Modal,
-    Portal,
-    RadioButton,
-    Text,
+  Chip,
+  IconButton,
+  Modal,
+  Portal,
+  RadioButton,
+  Text,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -221,8 +221,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const handleTrackPress = useCallback(
     (track: Models.Song, allTracks: Models.Song[]) => {
-      const index = allTracks.findIndex((t) => t.id === track.id);
-      playSong(track, allTracks, index);
+      playSong(track, allTracks);
     },
     [playSong],
   );

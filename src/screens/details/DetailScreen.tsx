@@ -4,12 +4,7 @@ import LoadingSpinner from "@/components/common/LoadingSpinner";
 import TrackItem from "@/components/items/TrackItem";
 import { COLORS } from "@/constants";
 import { useDetailStore } from "@/stores/detailStore";
-import {
-  useDominantColor,
-  usePlayerStore,
-  useSetDominantColor,
-} from "@/stores/playerStore";
-import { imageColorCache } from "@/utils/cache";
+import { usePlayerStore } from "@/stores/playerStore";
 import { getScreenPaddingBottom } from "@/utils/designSystem";
 import { handleAsync } from "@/utils/errorHandler";
 import { Album, Artist, Models, Playlist } from "@saavn-labs/sdk";
@@ -63,8 +58,6 @@ interface DetailData {
   stats?: { songCount?: number };
 }
 
-type TabType = "songs" | "albums";
-
 const DetailScreen: React.FC<DetailScreenProps> = ({
   type,
   id,
@@ -73,13 +66,12 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
 }) => {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { playSong, currentSong, toggleShuffle, isShuffled } = usePlayerStore();
-  const dominantColor = useDominantColor();
-  const setDominantColor = useSetDominantColor();
+  const { playSong, currentSong } = usePlayerStore();
 
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [dominantColor, setDominantColor] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   const {
@@ -119,15 +111,18 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
           result.data.images?.[2]?.url || result.data.images?.[0]?.url;
 
         if (imageUrl) {
-          const cachedColor = imageColorCache.get(imageUrl);
           const defaultColor = type === "artist" ? "#6366f1" : COLORS.PRIMARY;
-          const colorToUse = cachedColor || defaultColor;
+          const dominantColorResult = await handleAsync(async () => {
+            const { extractDominantColor } = await import("@/utils/colorUtils");
+            return await extractDominantColor(imageUrl);
+          }, "Failed to extract dominant color");
+
+          const colorToUse =
+            dominantColorResult.success && dominantColorResult.data
+              ? dominantColorResult.data.color
+              : defaultColor;
 
           setDominantColor(colorToUse);
-
-          if (!cachedColor) {
-            imageColorCache.set(imageUrl, colorToUse);
-          }
         }
       } else {
         setError(result.error || `Failed to load ${type}`);
@@ -157,20 +152,13 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
 
   const handlePlayAll = useCallback(() => {
     if (songs.length > 0) {
-      playSong(songs[0], songs, 0);
+      playSong(songs[0], songs);
     }
   }, [songs, playSong]);
 
-  const handleShuffle = useCallback(() => {
-    if (songs.length > 0) {
-      toggleShuffle();
-      playSong(songs[0], songs, 0);
-    }
-  }, [songs, playSong, toggleShuffle]);
-
   const handleTrackPress = useCallback(
-    (track: Models.Song, index: number) => {
-      playSong(track, songs, index);
+    (track: Models.Song) => {
+      playSong(track, songs);
     },
     [playSong, songs],
   );
@@ -225,7 +213,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
     ({ item, index }: { item: Models.Song; index: number }) => (
       <TrackItem
         track={item}
-        onPress={() => handleTrackPress(item, index)}
+        onPress={() => handleTrackPress(item)}
         showArtwork={type !== "album"}
         showIndex={type === "album"}
         index={index}
@@ -237,13 +225,85 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
 
   const renderAlbumItem = useCallback(
     ({ item }: { item: Models.Album }) => (
-      <GenericMediaItem
-        data={item}
-        type="album"
+      <TouchableOpacity
         onPress={() => onAlbumPress?.(item.id)}
-      />
+        style={styles.albumItemRow}
+        activeOpacity={0.7}
+      >
+        <Image
+          source={{ uri: item.images?.[2]?.url || item.images?.[0]?.url }}
+          style={styles.albumArtwork}
+          resizeMode="cover"
+        />
+
+        <View style={styles.albumInfo}>
+          <Text
+            variant="titleMedium"
+            numberOfLines={1}
+            style={[styles.albumRowTitle, { color: theme.colors.onSurface }]}
+          >
+            {item.title || "Unknown Album"}
+          </Text>
+
+          {item.subtitle && (
+            <Text
+              variant="bodySmall"
+              numberOfLines={1}
+              style={[
+                styles.albumRowSubtitle,
+                { color: theme.colors.onSurfaceVariant },
+              ]}
+            >
+              {item.subtitle}
+            </Text>
+          )}
+
+          <View style={styles.albumMetadata}>
+            {item.year && (
+              <Text
+                variant="labelSmall"
+                style={[
+                  styles.albumMetadataText,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+              >
+                {item.year}
+              </Text>
+            )}
+            {item.year && (item as any).songCount && (
+              <Text
+                variant="labelSmall"
+                style={[
+                  styles.albumMetadataText,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+              >
+                {" • "}
+              </Text>
+            )}
+            {(item as any).songCount && (
+              <Text
+                variant="labelSmall"
+                style={[
+                  styles.albumMetadataText,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+              >
+                {(item as any).songCount} songs
+              </Text>
+            )}
+          </View>
+        </View>
+
+        <IconButton
+          icon="chevron-right"
+          size={20}
+          iconColor={theme.colors.onSurfaceVariant}
+          style={styles.albumChevron}
+        />
+      </TouchableOpacity>
     ),
-    [onAlbumPress],
+    [onAlbumPress, theme],
   );
 
   const keyExtractor = useCallback(
@@ -310,7 +370,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
   const isArtist = type === "artist";
 
   if (isArtist) {
-    const topSongs = songs.slice(0, ARTIST_TOP_SONGS_LIMIT);
+    const topSongs = songs;
     const albums = data.albums?.top || [];
 
     return (
@@ -374,7 +434,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
                 onPress={handlePlayAll}
                 style={[
                   styles.playButtonLarge,
-                  { backgroundColor: dominantColor },
+                  { backgroundColor: COLORS.PRIMARY },
                 ]}
                 activeOpacity={0.8}
               >
@@ -383,21 +443,6 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
                   size={28}
                   iconColor="#000000"
                   style={styles.playIconLarge}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleShuffle}
-                style={styles.actionButton}
-                activeOpacity={0.7}
-              >
-                <IconButton
-                  icon="shuffle"
-                  size={24}
-                  iconColor={
-                    isShuffled ? dominantColor : theme.colors.onSurface
-                  }
-                  style={styles.actionIcon}
                 />
               </TouchableOpacity>
 
@@ -421,7 +466,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
                 style={[
                   styles.tab,
                   selectedTab === "songs" && {
-                    borderBottomColor: dominantColor,
+                    borderBottomColor: dominantColor || COLORS.PRIMARY,
                   },
                 ]}
                 activeOpacity={0.7}
@@ -444,7 +489,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
                 style={[
                   styles.tab,
                   selectedTab === "albums" && {
-                    borderBottomColor: dominantColor,
+                    borderBottomColor: dominantColor || COLORS.PRIMARY,
                   },
                 ]}
                 activeOpacity={0.7}
@@ -465,25 +510,47 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
 
             <View style={styles.artistContent}>
               {selectedTab === "songs" && (
-                <FlatList
-                  data={topSongs}
-                  renderItem={renderTrackItem}
-                  keyExtractor={keyExtractor}
-                  scrollEnabled={false}
-                  initialNumToRender={ARTIST_TOP_SONGS_LIMIT}
-                />
+                <>
+                  {topSongs.length > 0 ? (
+                    <FlatList
+                      data={topSongs}
+                      renderItem={renderTrackItem}
+                      keyExtractor={keyExtractor}
+                      scrollEnabled={false}
+                    />
+                  ) : (
+                    <View style={styles.emptyTabContent}>
+                      <Text
+                        variant="bodyLarge"
+                        style={{ color: theme.colors.onSurfaceVariant }}
+                      >
+                        No popular songs available
+                      </Text>
+                    </View>
+                  )}
+                </>
               )}
 
               {selectedTab === "albums" && (
-                <FlatList
-                  data={albums}
-                  renderItem={renderAlbumItem}
-                  keyExtractor={keyExtractor}
-                  scrollEnabled={false}
-                  initialNumToRender={10}
-                  numColumns={2}
-                  columnWrapperStyle={styles.albumGrid}
-                />
+                <>
+                  {albums.length > 0 ? (
+                    <FlatList
+                      data={albums}
+                      renderItem={renderAlbumItem}
+                      keyExtractor={keyExtractor}
+                      scrollEnabled={false}
+                    />
+                  ) : (
+                    <View style={styles.emptyTabContent}>
+                      <Text
+                        variant="bodyLarge"
+                        style={{ color: theme.colors.onSurfaceVariant }}
+                      >
+                        No albums available
+                      </Text>
+                    </View>
+                  )}
+                </>
               )}
             </View>
           </View>
@@ -557,8 +624,8 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
       >
         <LinearGradient
           colors={[
-            dominantColor,
-            `${dominantColor}cc`,
+            dominantColor || COLORS.PRIMARY,
+            `${dominantColor || COLORS.PRIMARY}cc`,
             theme.colors.background,
           ]}
           style={styles.heroHeader}
@@ -637,7 +704,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
               onPress={handlePlayAll}
               style={[
                 styles.playButtonLarge,
-                { backgroundColor: dominantColor },
+                { backgroundColor: COLORS.PRIMARY },
               ]}
               activeOpacity={0.8}
             >
@@ -646,19 +713,6 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
                 size={32}
                 iconColor="#000000"
                 style={styles.playIconLarge}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleShuffle}
-              style={styles.actionButton}
-              activeOpacity={0.7}
-            >
-              <IconButton
-                icon="shuffle"
-                size={26}
-                iconColor={isShuffled ? dominantColor : theme.colors.onSurface}
-                style={styles.actionIcon}
               />
             </TouchableOpacity>
 
@@ -682,9 +736,6 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
               renderItem={renderTrackItem}
               keyExtractor={keyExtractor}
               scrollEnabled={false}
-              initialNumToRender={15}
-              maxToRenderPerBatch={10}
-              windowSize={10}
             />
           </View>
         </View>
@@ -898,10 +949,71 @@ const styles = StyleSheet.create({
   },
   artistContent: {
     paddingTop: 8,
+    minHeight: 200,
   },
-  albumGrid: {
+  emptyTabContent: {
+    paddingVertical: 60,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  albumItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     gap: 12,
-    paddingHorizontal: 20,
+  },
+  albumArtwork: {
+    width: 56,
+    height: 56,
+    borderRadius: 4,
+  },
+  albumInfo: {
+    flex: 1,
+    justifyContent: "center",
+    gap: 2,
+  },
+  albumRowTitle: {
+    fontWeight: "600",
+  },
+  albumRowSubtitle: {
+    fontSize: 13,
+    opacity: 0.8,
+  },
+  albumMetadata: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  albumMetadataText: {
+    fontSize: 12,
+    opacity: 0.6,
+  },
+  albumChevron: {
+    margin: 0,
+  },
+  albumItemContainer: {
+    flex: 1,
+    maxWidth: (SCREEN_WIDTH - 52) / 2,
+  },
+  albumTextContainer: {
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  albumTitle: {
+    fontWeight: "600",
+    marginBottom: 4,
+    lineHeight: 18,
+  },
+  albumSubtitle: {
+    fontSize: 12,
+    marginBottom: 2,
+    opacity: 0.8,
+  },
+  albumYear: {
+    fontSize: 11,
+    opacity: 0.6,
+    marginTop: 2,
   },
 });
 

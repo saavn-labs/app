@@ -1,5 +1,4 @@
-import { initializeAudioMode, playerService } from "@/services/PlayerService";
-import { useAudioPlayer } from "expo-audio";
+import { usePlayerStore } from "@/stores/playerStore";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -49,12 +48,7 @@ export default function Layout() {
     SpotifyMedium: require("../assets/fonts/SpotifyMedium.ttf"),
   });
 
-  const audioPlayer = useAudioPlayer({
-    headers: {
-      "Accept-Ranges": "bytes",
-      Range: "bytes=0-",
-    },
-  });
+  const { restoreLastTrack } = usePlayerStore();
 
   useEffect(() => {
     if (fontsLoaded) {
@@ -83,22 +77,10 @@ export default function Layout() {
   useEffect(() => {
     if (fontsLoaded || fontError) {
       void SplashScreen.hideAsync();
+      // Restore last played track on app startup
+      void restoreLastTrack();
     }
-  }, [fontsLoaded, fontError]);
-
-  useEffect(() => {
-    console.log("[Layout] Initializing player...");
-    try {
-      console.log("[Layout] Setting audio player instance on playerService");
-      playerService.setAudioPlayer(audioPlayer);
-      console.log("[Layout] Audio player instance set successfully");
-
-      initializeAudioMode();
-      console.log("[Layout] Player initialization completed");
-    } catch (error) {
-      console.error("[Layout] Failed to initialize player:", error);
-    }
-  }, [audioPlayer]);
+  }, [fontsLoaded, fontError, restoreLastTrack]);
 
   if (!fontsLoaded && !fontError) {
     return null;

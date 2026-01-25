@@ -22,7 +22,7 @@ export const sizes = {
 
 export const getScreenPaddingBottom = (
   includePlayer = true,
-  includeTabBar = true
+  includeTabBar = true,
 ): number => {
   let padding = 0;
   if (includeTabBar) padding += sizes.tabBarHeight;

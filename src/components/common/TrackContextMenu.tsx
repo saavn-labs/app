@@ -5,22 +5,22 @@ import { Models } from "@saavn-labs/sdk";
 import { useRouter } from "expo-router";
 import React, { memo, useCallback, useEffect, useState } from "react";
 import {
-    Alert,
-    Modal,
-    Share,
-    StyleSheet,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  Alert,
+  Modal,
+  Share,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 import {
-    ActivityIndicator,
-    Divider,
-    List,
-    Portal,
-    Surface,
-    Text,
-    useTheme,
+  ActivityIndicator,
+  Divider,
+  List,
+  Portal,
+  Surface,
+  Text,
+  useTheme,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 

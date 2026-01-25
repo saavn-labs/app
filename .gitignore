@@ -80,3 +80,6 @@ yarn-error.*
 *.tsbuildinfo
 
 # @end expo-cli
+
+android/app/release.keystore
+android/gradle.properties

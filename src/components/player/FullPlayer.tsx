@@ -1,14 +1,14 @@
 import { useLibraryStore } from "@/stores/libraryStore";
 import {
-    useCurrentSong,
-    useDominantColor,
-    useDuration,
-    usePlaybackControls,
-    usePlaybackStatus,
-    usePlayerActions,
-    useProgress,
-    useQueue,
-    useSetDominantColor,
+  useCurrentSong,
+  useDominantColor,
+  useDuration,
+  usePlaybackStatus,
+  usePlayerActions,
+  useProgress,
+  useRepeatMode,
+  useSetDominantColor,
+  useUpcomingTracks,
 } from "@/stores/playerStore";
 import { createColorGradient, extractAndUpdateColor } from "@/utils/colorUtils";
 import { formatShareMessage, formatTime } from "@/utils/formatters";
@@ -19,14 +19,14 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Animated,
-    Dimensions,
-    FlatList,
-    Modal,
-    Share,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  FlatList,
+  Modal,
+  Share,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Text } from "react-native-paper";
 import TrackItem from "../items/TrackItem";
@@ -43,30 +43,21 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
   const status = usePlaybackStatus();
   const progress = useProgress();
   const duration = useDuration();
-  const { isShuffled, repeatMode } = usePlaybackControls();
-  const { queue, currentIndex } = useQueue();
   const dominantColor = useDominantColor();
   const setDominantColor = useSetDominantColor();
+  const upcomingTracks = useUpcomingTracks();
+  const repeatMode = useRepeatMode();
   const { isFavorite, toggleFavorite: toggleFavoriteInStore } =
     useLibraryStore();
 
-  const {
-    togglePlayPause,
-    playSong,
-    playNext,
-    playPrevious,
-    seekTo,
-    toggleShuffle,
-    toggleRepeatMode,
-  } = usePlayerActions();
+  const { togglePlayPause, playSong, next, seekTo, toggleRepeatMode } =
+    usePlayerActions();
 
   const [seekValue, setSeekValue] = useState(progress);
   const [isDragging, setIsDragging] = useState(false);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
-
-  const upNextTracks = queue.slice(currentIndex + 1);
 
   useEffect(() => {
     if (visible) {
@@ -103,7 +94,11 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
   }, [progress, isDragging]);
 
   const getRepeatIcon = useCallback(() => {
-    return repeatMode ? "repeat-one-on" : "repeat";
+    return repeatMode === "all"
+      ? "repeat"
+      : repeatMode === "one"
+        ? "repeat-one"
+        : "repeat";
   }, [repeatMode]);
 
   const handleSeekStart = useCallback(() => {
@@ -293,23 +288,19 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
 
             <View style={styles.controlsContainer}>
               <TouchableOpacity
-                onPress={toggleShuffle}
+                onPress={toggleRepeatMode}
                 style={styles.secondaryControl}
                 activeOpacity={0.7}
               >
                 <MaterialIcons
-                  name="shuffle"
-                  size={26}
-                  color={isShuffled ? "#1db954" : "rgba(255, 255, 255, 0.7)"}
+                  name={getRepeatIcon()}
+                  size={30}
+                  color={
+                    repeatMode !== "off"
+                      ? "#1db954"
+                      : "rgba(255, 255, 255, 0.7)"
+                  }
                 />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={playPrevious}
-                style={styles.skipControl}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons name="skip-previous" size={40} color="#ffffff" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -326,31 +317,19 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={playNext}
+                onPress={next}
                 style={styles.skipControl}
                 activeOpacity={0.7}
               >
                 <MaterialIcons name="skip-next" size={40} color="#ffffff" />
               </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={toggleRepeatMode}
-                style={styles.secondaryControl}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons
-                  name={getRepeatIcon()}
-                  size={26}
-                  color={repeatMode ? "#1db954" : "rgba(255, 255, 255, 0.7)"}
-                />
-              </TouchableOpacity>
             </View>
 
-            {upNextTracks.length > 0 && (
+            {upcomingTracks.length > 0 && (
               <View style={styles.upNextContainer}>
                 <Text style={styles.upNextHeader}>Up Next</Text>
                 <FlatList
-                  data={upNextTracks}
+                  data={upcomingTracks}
                   renderItem={renderUpNextItem}
                   keyExtractor={(item, index) => `${item.id}-${index}`}
                   scrollEnabled={false}
@@ -475,7 +454,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 24,
     marginBottom: 16,
-    gap: 8,
+    gap: 30,
   },
   secondaryControl: {
     width: 44,

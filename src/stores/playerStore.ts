@@ -1,5 +1,5 @@
-import { playerService, PlayerState } from "@/services/PlayerService";
-import { queueService } from "@/services/QueueService";
+import { playerService, PlayerState, queueService } from "@/services";
+import { RepeatMode } from "@/types";
 import { Models } from "@saavn-labs/sdk";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -8,89 +8,163 @@ import { appStorage } from "./storage";
 interface PlayerStore extends PlayerState {
   dominantColor: string;
   setDominantColor: (color: string) => void;
-  playSong: (
-    song: Models.Song,
-    queue?: Models.Song[],
-    startIndex?: number,
-  ) => Promise<void>;
-  play: () => Promise<void>;
+  playSong: (song: Models.Song, queue?: Models.Song[]) => Promise<void>;
+  resume: () => Promise<void>;
   pause: () => Promise<void>;
   togglePlayPause: () => Promise<void>;
-  playNext: () => Promise<void>;
-  playPrevious: () => Promise<void>;
+  next: () => Promise<void>;
+  previous: () => Promise<void>;
   seekTo: (position: number) => Promise<void>;
-  toggleRepeatMode: () => void;
-  jumpToQueueIndex: (index: number) => Promise<void>;
-  release: () => Promise<void>;
+  toggleRepeatMode: () => Promise<void>;
+  stop: () => Promise<void>;
+  addToQueue: (song: Models.Song) => Promise<void>;
+  addNextInQueue: (song: Models.Song) => Promise<void>;
+  restoreLastTrack: () => Promise<void>;
 }
 
 export const usePlayerStore = create<PlayerStore>()(
   persist(
-    (set, _) => {
+    (set, get) => {
       playerService.setStateUpdater((updates) => {
+        if (__DEV__) {
+          console.log(
+            "[PlayerStore] Update from PlayerService:",
+            Object.keys(updates),
+          );
+        }
         set((state) => ({ ...state, ...updates }));
       });
 
       queueService.setStateUpdater((updates) => {
+        if (__DEV__) {
+          console.log(
+            "[PlayerStore] Update from QueueService:",
+            Object.keys(updates),
+          );
+        }
         set((state) => ({ ...state, ...updates }));
       });
 
       return {
         status: "idle",
         currentSong: null,
-        currentIndex: -1,
-        queue: [],
+        upcomingTracks: [],
         progress: 0,
         duration: 0,
-        isShuffled: false,
-        repeatMode: false,
-        error: null,
+        repeatMode: "off" as RepeatMode,
         dominantColor: "#1a1a1a",
 
         setDominantColor: (color: string) => {
           set({ dominantColor: color });
         },
 
-        playSong: async (song, queue, startIndex) => {
-          await playerService.playSong(song, queue, startIndex);
+        playSong: async (song, queue) => {
+          try {
+            await playerService.play(song, queue);
+          } catch (error) {
+            console.error("[PlayerStore] playSong error:", error);
+            set({ status: "error" });
+          }
         },
 
-        play: async () => {
-          await playerService.play();
+        resume: async () => {
+          try {
+            await playerService.resume();
+          } catch (error) {
+            console.error("[PlayerStore] resume error:", error);
+          }
         },
 
         pause: async () => {
-          await playerService.pause();
+          try {
+            await playerService.pause();
+          } catch (error) {
+            console.error("[PlayerStore] pause error:", error);
+          }
         },
 
         togglePlayPause: async () => {
-          await playerService.togglePlayPause();
+          try {
+            await playerService.togglePlayPause();
+          } catch (error) {
+            console.error("[PlayerStore] togglePlayPause error:", error);
+          }
         },
 
-        playNext: async () => {
-          await playerService.playNext();
+        next: async () => {
+          try {
+            await playerService.next();
+          } catch (error) {
+            console.error("[PlayerStore] next error:", error);
+          }
         },
 
-        playPrevious: async () => {
-          await playerService.playPrevious();
+        previous: async () => {
+          try {
+            await playerService.previous();
+          } catch (error) {
+            console.error("[PlayerStore] previous error:", error);
+          }
         },
 
         seekTo: async (position) => {
           set({ progress: position });
-          await playerService.seekTo(position);
+          try {
+            await playerService.seekTo(position);
+          } catch (error) {
+            console.error("[PlayerStore] seekTo error:", error);
+          }
         },
 
-        toggleRepeatMode: () => {
-          const newMode = queueService.toggleRepeatMode();
-          set({ repeatMode: newMode });
+        toggleRepeatMode: async () => {
+          try {
+            const currentMode = get().repeatMode;
+            const modes: RepeatMode[] = ["off", "all", "one"];
+            const currentIdx = modes.indexOf(currentMode);
+            const newMode = modes[(currentIdx + 1) % modes.length];
+
+            await playerService.setRepeatMode(newMode);
+          } catch (error) {
+            console.error("[PlayerStore] toggleRepeatMode error:", error);
+          }
         },
 
-        jumpToQueueIndex: async (index) => {
-          await playerService.jumpToQueueIndex(index);
+        stop: async () => {
+          try {
+            await playerService.stop();
+          } catch (error) {
+            console.error("[PlayerStore] stop error:", error);
+          }
         },
 
-        release: async () => {
-          await playerService.release();
+        addToQueue: async (song) => {
+          try {
+            await playerService.addToQueue(song);
+          } catch (error) {
+            console.error("[PlayerStore] addToQueue error:", error);
+          }
+        },
+
+        addNextInQueue: async (song) => {
+          try {
+            await playerService.addNextInQueue(song);
+          } catch (error) {
+            console.error("[PlayerStore] addNextInQueue error:", error);
+          }
+        },
+
+        restoreLastTrack: async () => {
+          try {
+            const state = get();
+            if (state.currentSong) {
+              await playerService.restoreLastPlayedTrack(
+                state.currentSong,
+                state.progress,
+              );
+            }
+          } catch (error) {
+            console.error("[PlayerStore] restoreLastTrack error:", error);
+          }
         },
       };
     },
@@ -98,10 +172,9 @@ export const usePlayerStore = create<PlayerStore>()(
       name: "player-storage",
       storage: createJSONStorage(() => appStorage),
       partialize: (state) => ({
-        queue: state.queue,
-        currentIndex: state.currentIndex,
         currentSong: state.currentSong,
-        isShuffled: state.isShuffled,
+        progress: state.progress,
+        duration: state.duration,
         repeatMode: state.repeatMode,
         dominantColor: state.dominantColor,
       }),
@@ -114,28 +187,24 @@ export const useCurrentSong = () =>
   usePlayerStore((state) => state.currentSong);
 export const useProgress = () => usePlayerStore((state) => state.progress);
 export const useDuration = () => usePlayerStore((state) => state.duration);
-export const useQueue = () =>
-  usePlayerStore((state) => ({
-    queue: state.queue,
-    currentIndex: state.currentIndex,
-  }));
-export const usePlaybackControls = () =>
-  usePlayerStore((state) => ({
-    isShuffled: state.isShuffled,
-    repeatMode: state.repeatMode,
-  }));
+export const useUpcomingTracks = () =>
+  usePlayerStore((state) => state.upcomingTracks);
+export const useRepeatMode = () => usePlayerStore((state) => state.repeatMode);
+export const useDominantColor = () =>
+  usePlayerStore((state) => state.dominantColor);
+
 export const usePlayerActions = () =>
   usePlayerStore((state) => ({
     playSong: state.playSong,
-    play: state.play,
+    resume: state.resume,
     pause: state.pause,
     togglePlayPause: state.togglePlayPause,
-    playNext: state.playNext,
-    playPrevious: state.playPrevious,
+    next: state.next,
+    previous: state.previous,
     seekTo: state.seekTo,
     toggleRepeatMode: state.toggleRepeatMode,
+    stop: state.stop,
   }));
-export const useDominantColor = () =>
-  usePlayerStore((state) => state.dominantColor);
+
 export const useSetDominantColor = () =>
   usePlayerStore((state) => state.setDominantColor);

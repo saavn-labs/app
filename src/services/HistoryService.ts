@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { appStorage } from "@/stores/storage";
 import { Models } from "@saavn-labs/sdk";
 
 const HISTORY_KEY = "@playback_history";
@@ -22,7 +22,7 @@ export interface HistorySection {
  */
 export class HistoryService {
   async getHistory(): Promise<HistoryEntry[]> {
-    const data = await AsyncStorage.getItem(HISTORY_KEY);
+    const data = await appStorage.getItem(HISTORY_KEY);
     if (!data) return [];
 
     const parsed: HistoryEntry[] = JSON.parse(data);
@@ -48,7 +48,7 @@ export class HistoryService {
   }
 
   async clearHistory(): Promise<void> {
-    await AsyncStorage.removeItem(HISTORY_KEY);
+    await appStorage.removeItem(HISTORY_KEY);
   }
 
   async getHistorySections(): Promise<HistorySection[]> {
@@ -165,7 +165,7 @@ export class HistoryService {
   }
 
   private async saveHistory(history: HistoryEntry[]): Promise<void> {
-    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    await appStorage.setItem(HISTORY_KEY, JSON.stringify(history));
   }
 }
 

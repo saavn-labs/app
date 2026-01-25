@@ -7,5 +7,5 @@
       "@app/*": ["./app/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "src-dmp.js", "src-clean-inline-comments.js"]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "src-dump.js", "src-clean-inline-comments.js", "index.js"]
 }

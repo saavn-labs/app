@@ -50,7 +50,6 @@
           "position": "relative"
         }
       ],
-      "expo-audio",
       "expo-speech-recognition"
     ],
     "experiments": {
