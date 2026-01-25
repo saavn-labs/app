@@ -105,15 +105,12 @@ android {
         release {
             signingConfig signingConfigs.release
 
-            shrinkResources true
-            minifyEnabled true
-
-            proguardFiles(
-                "${android.sdkDirectory}/tools/proguard/proguard-android-optimize.txt",
-                "proguard-rules.pro"
-            )
-
-            crunchPngs true
+             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
+            shrinkResources enableShrinkResources.toBoolean()
+            minifyEnabled enableMinifyInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            def enablePngCrunchInRelease = findProperty('android.enablePngCrunchInReleaseBuilds') ?: 'true'
+            crunchPngs enablePngCrunchInRelease.toBoolean()
         }
 
     }
@@ -138,7 +135,7 @@ android {
             enable true
             reset()
             include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
-            universalApk true
+            universalApk false
         }
     }
 

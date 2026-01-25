@@ -12,3 +12,5 @@
 -keep class com.facebook.react.turbomodule.** { *; }
 
 # Add any project specific keep options here:
+-keep class com.doublesymmetry.trackplayer.** { *; }
+-keep class com.google.android.exoplayer2.** { *; }

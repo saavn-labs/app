@@ -17,6 +17,7 @@
     "expo-image": "~3.0.11",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.11",
+    "expo-media-library": "~18.2.1",
     "expo-navigation-bar": "~5.0.10",
     "expo-router": "~6.0.21",
     "expo-speech-recognition": "^3.0.1",

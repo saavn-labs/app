@@ -31,16 +31,11 @@ const GenericMediaItem: React.FC<GenericMediaItemProps> = memo(
   ({ data, type, onPress, horizontal = false, testID }) => {
     const theme = useTheme();
 
-    const getImageUrl = (): string => {
-      if (!data.images || data.images.length === 0) return "";
-      return data.images[2]?.url;
-    };
-
     const getTitle = (): string => {
       return data.title || data.name || "Unknown";
     };
 
-    const imageUrl = getImageUrl();
+    const imageUrl = data.images?.[2]?.url;
     const title = getTitle();
     const isCircular = type === "artist";
 
@@ -58,7 +53,7 @@ const GenericMediaItem: React.FC<GenericMediaItemProps> = memo(
           testID={testID}
         >
           <Image
-            source={{ uri: imageUrl }}
+            source={{ uri: imageUrl}}
             style={imageStyle}
             contentFit="cover"
             transition={200}
@@ -94,7 +89,7 @@ const GenericMediaItem: React.FC<GenericMediaItemProps> = memo(
         testID={testID}
       >
         <Image
-          source={{ uri: imageUrl }}
+          source={{ uri: imageUrl}}
           style={imageStyle}
           contentFit="cover"
           transition={200}

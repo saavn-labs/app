@@ -231,7 +231,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
         activeOpacity={0.7}
       >
         <Image
-          source={{ uri: item.images?.[2]?.url || item.images?.[0]?.url }}
+          source={{ uri: item.images[2].url }}
           style={styles.albumArtwork}
           resizeMode="cover"
         />
@@ -366,7 +366,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
   }
 
   const displayName = data.title || data.name || "Unknown";
-  const imageUrl = data.images?.[2]?.url || data.images?.[0]?.url;
+  const imageUrl = data.images?.[2]?.url;
   const isArtist = type === "artist";
 
   if (isArtist) {

@@ -73,7 +73,7 @@ const TrackItem: React.FC<TrackItemProps> = ({
         ) : showArtwork && track.images?.[0]?.url ? (
           <View style={styles.artworkContainer}>
             <Image
-              source={{ uri: track.images[0].url }}
+              source={{ uri: track.images[1].url}}
               style={styles.artwork}
               resizeMode="cover"
             />

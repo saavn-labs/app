@@ -87,11 +87,7 @@ const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
           <View style={styles.leftContent}>
             <View style={styles.artworkContainer}>
               <Image
-                source={{
-                  uri:
-                    currentSong.images?.[2]?.url ||
-                    currentSong.images?.[0]?.url,
-                }}
+                source={{ uri: currentSong.images?.[1]?.url }}
                 style={styles.artwork}
                 resizeMode="cover"
               />

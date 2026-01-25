@@ -4,13 +4,7 @@ import { useCurrentSong, usePlayerActions } from "@/stores/playerStore";
 import { useSearchStore } from "@/stores/searchStore";
 import { getScreenPaddingBottom } from "@/utils/designSystem";
 import { Models } from "@saavn-labs/sdk";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   ScrollView,
@@ -32,7 +26,6 @@ interface SearchScreenProps {
 }
 
 const MIN_SEARCH_LENGTH = 2;
-const MAX_RECENT_SEARCHES_DISPLAY = 5;
 
 const SkeletonItem = React.memo(() => {
   const fadeAnim = useRef(new Animated.Value(0.3)).current;
@@ -57,27 +50,15 @@ const SkeletonItem = React.memo(() => {
   }, []);
 
   return (
-    <View style={styles.skeletonItem}>
-      <Animated.View style={[styles.skeletonImage, { opacity: fadeAnim }]} />
+    <Animated.View style={[styles.skeletonItem, { opacity: fadeAnim }]}>
+      <View style={styles.skeletonImage} />
       <View style={styles.skeletonContent}>
-        <Animated.View style={[styles.skeletonTitle, { opacity: fadeAnim }]} />
-        <Animated.View
-          style={[styles.skeletonSubtitle, { opacity: fadeAnim }]}
-        />
+        <View style={styles.skeletonTitle} />
+        <View style={styles.skeletonSubtitle} />
       </View>
-    </View>
+    </Animated.View>
   );
 });
-
-const SkeletonList = React.memo(
-  ({ count = UI_CONFIG.SKELETON_ITEMS }: { count?: number }) => (
-    <View style={styles.section}>
-      {Array.from({ length: count }).map((_, index) => (
-        <SkeletonItem key={`skeleton-${index}`} />
-      ))}
-    </View>
-  ),
-);
 
 const RecentSearchItem = React.memo(
   ({
@@ -90,119 +71,51 @@ const RecentSearchItem = React.memo(
     onRemove: () => void;
   }) => {
     const theme = useTheme();
-
     return (
       <TouchableOpacity
-        onPress={onPress}
         style={styles.recentItem}
+        onPress={onPress}
         activeOpacity={0.7}
       >
         <IconButton
-          icon="clock-outline"
+          icon="history"
           size={20}
-          iconColor={theme.colors.onSurfaceVariant}
           style={styles.recentIcon}
+          iconColor={theme.colors.onSurfaceVariant}
         />
-        <Text
-          variant="bodyLarge"
-          style={styles.recentSearchText}
-          numberOfLines={1}
-        >
-          {search}
-        </Text>
+        <Text style={styles.recentSearchText}>{search}</Text>
         <IconButton
           icon="close"
           size={18}
+          style={styles.removeIcon}
           iconColor={theme.colors.onSurfaceVariant}
           onPress={(e) => {
-            e?.stopPropagation?.();
+            e?.stopPropagation();
             onRemove();
           }}
-          style={styles.removeIcon}
         />
       </TouchableOpacity>
     );
   },
 );
 
-const RecentSearches = React.memo(
-  ({
-    searches,
-    onSelect,
-    onRemove,
-    onClearAll,
-    maxDisplay = MAX_RECENT_SEARCHES_DISPLAY,
-  }: {
-    searches: string[];
-    onSelect: (search: string) => void;
-    onRemove: (search: string) => void;
-    onClearAll: () => void;
-    maxDisplay?: number;
-  }) => {
-    const theme = useTheme();
-
-    if (searches.length === 0) return null;
-
-    const displaySearches = searches.slice(0, maxDisplay);
-
-    return (
-      <View style={styles.recentSection}>
-        <View style={styles.recentHeader}>
-          <Text variant="titleMedium" style={styles.recentTitle}>
-            Recent searches
-          </Text>
-          <TouchableOpacity onPress={onClearAll} activeOpacity={0.7}>
-            <Text style={[styles.clearText, { color: theme.colors.primary }]}>
-              Clear all
-            </Text>
-          </TouchableOpacity>
-        </View>
-        {displaySearches.map((item, index) => (
-          <RecentSearchItem
-            key={`recent-${index}`}
-            search={item}
-            onPress={() => onSelect(item)}
-            onRemove={() => onRemove(item)}
-          />
-        ))}
-      </View>
-    );
-  },
-);
-
-const EmptySearchState = React.memo(({ query }: { query: string }) => {
+const EmptyState = React.memo(({ query }: { query: string }) => {
   const theme = useTheme();
-  const scaleAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      tension: 50,
-      friction: 7,
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
   return (
-    <Animated.View
-      style={[styles.emptyState, { transform: [{ scale: scaleAnim }] }]}
-    >
+    <View style={styles.emptyState}>
       <IconButton
         icon="magnify"
         size={64}
-        iconColor={theme.colors.onSurfaceVariant}
         style={styles.emptyIcon}
+        iconColor={theme.colors.onSurfaceVariant}
       />
       <Text variant="titleMedium" style={styles.emptyTitle}>
         No results for "{query}"
       </Text>
-      <Text
-        variant="bodyMedium"
-        style={[styles.emptySubtitle, { color: theme.colors.onSurfaceVariant }]}
-      >
+      <Text variant="bodyMedium" style={styles.emptySubtitle}>
         Try searching with different keywords
       </Text>
-    </Animated.View>
+    </View>
   );
 });
 
@@ -213,10 +126,8 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
   onBack,
 }) => {
   const theme = useTheme();
-
   const { playSong } = usePlayerActions();
   const currentSong = useCurrentSong();
-
   const insets = useSafeAreaInsets();
   const bottomPadding = getScreenPaddingBottom(true, true) + insets.bottom;
 
@@ -227,7 +138,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
     setActiveTab,
     results,
     loadingStates,
-    error,
     recentSearches,
     loadRecentSearches,
     removeRecentSearch,
@@ -239,51 +149,22 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
 
   const [isVoiceModalVisible, setIsVoiceModalVisible] = useState(false);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const previousActiveTabRef = useRef<SearchTab | null>(activeTab);
 
   useEffect(() => {
     loadRecentSearches();
-  }, [loadRecentSearches]);
+  }, []);
 
   useEffect(() => {
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       cancelSearch();
     };
-  }, [cancelSearch]);
+  }, []);
 
   useEffect(() => {
-    const trimmedQuery = searchQuery.trim();
-    const hasQuery = trimmedQuery.length >= MIN_SEARCH_LENGTH;
-
-    if (!hasQuery || !activeTab) return;
-
-    const isCurrentTabLoading = loadingStates[activeTab];
-    if (isCurrentTabLoading) return;
-
-    const currentTabResults = results[activeTab] || [];
-    const hasCurrentTabResults = currentTabResults.length > 0;
-
-    if (!hasCurrentTabResults && activeTab !== "songs") {
-      const hasSongsResults = (results.songs || []).length > 0;
-      const isSongsLoading = loadingStates.songs;
-
-      if (hasSongsResults || !isSongsLoading) {
-        previousActiveTabRef.current = activeTab;
-        setActiveTab("songs");
-      }
-    }
-  }, [activeTab, results, loadingStates, searchQuery, setActiveTab]);
-
-  useEffect(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
 
     const trimmedQuery = searchQuery.trim();
-
     if (trimmedQuery.length >= MIN_SEARCH_LENGTH) {
       debounceTimerRef.current = setTimeout(() => {
         executeSearch(trimmedQuery, activeTab);
@@ -292,13 +173,39 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
       cancelSearch();
       clearSearchResults();
     }
+  }, [searchQuery, activeTab]);
 
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, [searchQuery, activeTab, executeSearch, clearSearchResults, cancelSearch]);
+  useEffect(() => {
+    const trimmedQuery = searchQuery.trim();
+    const hasQuery = trimmedQuery.length >= MIN_SEARCH_LENGTH;
+    const hasAnyResults =
+      results.songs?.length ||
+      results.albums?.length ||
+      results.artists?.length ||
+      results.playlists?.length;
+    const isAnyLoading = Object.values(loadingStates).some(
+      (loading) => loading,
+    );
+
+    if (hasQuery && !hasAnyResults && !isAnyLoading && activeTab === null) {
+      setActiveTab("songs");
+    }
+  }, [searchQuery, results, loadingStates, activeTab, setActiveTab]);
+
+  const handleTrackPress = useCallback(
+    (track: Models.Song) => playSong(track),
+    [playSong],
+  );
+  
+  const handleRecentSearchSelect = useCallback(
+    (search: string) => setSearchQuery(search),
+    [setSearchQuery],
+  );
+  
+  const handleTabPress = useCallback(
+    (tabId: SearchTab) => setActiveTab(activeTab === tabId ? null : tabId),
+    [activeTab, setActiveTab],
+  );
 
   const handleVoiceResult = useCallback(
     (text: string) => {
@@ -309,44 +216,16 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
     [executeSearch, setSearchQuery],
   );
 
-  const handleTrackPress = useCallback(
-    (track: Models.Song) => {
-      playSong(track);
-    },
-    [playSong],
-  );
-
-  const handleClearRecentSearches = useCallback(async () => {
-    await clearRecentSearches();
-  }, [clearRecentSearches]);
-
-  const handleRecentSearchSelect = useCallback(
-    (search: string) => {
-      setSearchQuery(search);
-    },
-    [setSearchQuery],
-  );
-
-  const handleRemoveRecentSearch = useCallback(
-    async (search: string) => {
-      await removeRecentSearch(search);
-    },
-    [removeRecentSearch],
-  );
-
   const renderSectionHeader = useCallback(
     (title: string, count: number) => (
       <View style={styles.sectionHeaderContainer}>
-        <Text variant="titleLarge" style={styles.sectionHeaderText}>
+        <Text variant="headlineSmall" style={styles.sectionHeaderText}>
           {title}
         </Text>
         {count > 5 && (
           <Text
             variant="bodySmall"
-            style={[
-              styles.sectionCount,
-              { color: theme.colors.onSurfaceVariant },
-            ]}
+            style={{ color: theme.colors.onSurfaceVariant }}
           >
             {count} results
           </Text>
@@ -358,11 +237,17 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
 
   const renderSongsList = useCallback(
     (songs: Models.Song[], isLoading: boolean) => {
-      if (isLoading) return <SkeletonList count={3} />;
+      if (isLoading)
+        return (
+          <>
+            {Array.from({ length: UI_CONFIG.SKELETON_ITEMS }).map((_, i) => (
+              <SkeletonItem key={i} />
+            ))}
+          </>
+        );
       if (songs.length === 0) return null;
 
       const displaySongs = activeTab === "songs" ? songs : songs.slice(0, 5);
-
       return (
         <View style={styles.section}>
           {renderSectionHeader("Songs", songs.length)}
@@ -378,17 +263,23 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
         </View>
       );
     },
-    [activeTab, currentSong, handleTrackPress, renderSectionHeader],
+    [activeTab, currentSong?.id, handleTrackPress, renderSectionHeader],
   );
 
   const renderAlbumsList = useCallback(
     (albums: Models.Album[], isLoading: boolean) => {
-      if (isLoading) return <SkeletonList count={3} />;
+      if (isLoading)
+        return (
+          <>
+            {Array.from({ length: UI_CONFIG.SKELETON_ITEMS }).map((_, i) => (
+              <SkeletonItem key={i} />
+            ))}
+          </>
+        );
       if (albums.length === 0) return null;
 
       const displayAlbums =
         activeTab === "albums" ? albums : albums.slice(0, 5);
-
       return (
         <View style={styles.section}>
           {renderSectionHeader("Albums", albums.length)}
@@ -408,12 +299,18 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
 
   const renderArtistsList = useCallback(
     (artists: Models.Artist[], isLoading: boolean) => {
-      if (isLoading) return <SkeletonList count={3} />;
+      if (isLoading)
+        return (
+          <>
+            {Array.from({ length: UI_CONFIG.SKELETON_ITEMS }).map((_, i) => (
+              <SkeletonItem key={i} />
+            ))}
+          </>
+        );
       if (artists.length === 0) return null;
 
       const displayArtists =
         activeTab === "artists" ? artists : artists.slice(0, 5);
-
       return (
         <View style={styles.section}>
           {renderSectionHeader("Artists", artists.length)}
@@ -433,12 +330,18 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
 
   const renderPlaylistsList = useCallback(
     (playlists: Models.Playlist[], isLoading: boolean) => {
-      if (isLoading) return <SkeletonList count={3} />;
+      if (isLoading)
+        return (
+          <>
+            {Array.from({ length: UI_CONFIG.SKELETON_ITEMS }).map((_, i) => (
+              <SkeletonItem key={i} />
+            ))}
+          </>
+        );
       if (playlists.length === 0) return null;
 
       const displayPlaylists =
         activeTab === "playlists" ? playlists : playlists.slice(0, 5);
-
       return (
         <View style={styles.section}>
           {renderSectionHeader("Playlists", playlists.length)}
@@ -446,8 +349,8 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
             <GenericMediaItem
               key={item.id}
               data={item}
-              type="playlist"
               onPress={() => onPlaylistPress(item.id)}
+              type="playlist"
             />
           ))}
         </View>
@@ -456,47 +359,44 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
     [activeTab, onPlaylistPress, renderSectionHeader],
   );
 
-  const renderContent = () => {
+  const renderContent = useMemo(() => {
     const hasQuery = searchQuery.trim().length >= MIN_SEARCH_LENGTH;
     const hasAnyResults =
-      results.songs?.length > 0 ||
-      results.albums?.length > 0 ||
-      results.artists?.length > 0 ||
-      results.playlists?.length > 0;
+      results.songs?.length ||
+      results.albums?.length ||
+      results.artists?.length ||
+      results.playlists?.length;
 
     if (!hasQuery && !hasAnyResults) {
-      return (
-        <RecentSearches
-          searches={recentSearches}
-          onSelect={handleRecentSearchSelect}
-          onRemove={handleRemoveRecentSearch}
-          onClearAll={handleClearRecentSearches}
-        />
-      );
-    }
-
-    if (error) {
-      return (
-        <View style={styles.errorContainer}>
-          <IconButton
-            icon="alert-circle-outline"
-            size={64}
-            iconColor="#ef4444"
-            style={styles.errorIcon}
-          />
-          <Text variant="titleMedium" style={styles.errorText}>
-            {error}
-          </Text>
+      return recentSearches.length > 0 ? (
+        <View style={styles.recentSection}>
+          <View style={styles.recentHeader}>
+            <Text variant="titleMedium" style={styles.recentTitle}>
+              Recent searches
+            </Text>
+            <TouchableOpacity onPress={clearRecentSearches}>
+              <Text style={[styles.clearText, { color: theme.colors.primary }]}>
+                Clear all
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {recentSearches.slice(0, 5).map((item, index) => (
+            <RecentSearchItem
+              key={index}
+              search={item}
+              onPress={() => handleRecentSearchSelect(item)}
+              onRemove={() => removeRecentSearch(item)}
+            />
+          ))}
         </View>
-      );
+      ) : null;
     }
 
     const isAnyLoading = Object.values(loadingStates).some(
       (loading) => loading,
     );
-
     if (!hasAnyResults && !isAnyLoading && hasQuery) {
-      return <EmptySearchState query={searchQuery} />;
+      return <EmptyState query={searchQuery} />;
     }
 
     if (activeTab) {
@@ -526,17 +426,14 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
         {renderPlaylistsList(results.playlists || [], loadingStates.playlists)}
       </>
     );
-  };
+  }, [searchQuery, results, loadingStates, recentSearches, activeTab, theme]);
 
-  const tabs = useMemo(
-    () => [
-      { id: "songs" as SearchTab, label: "Songs" },
-      { id: "albums" as SearchTab, label: "Albums" },
-      { id: "artists" as SearchTab, label: "Artists" },
-      { id: "playlists" as SearchTab, label: "Playlists" },
-    ],
-    [],
-  );
+  const tabs = [
+    { id: "songs" as SearchTab, label: "Songs" },
+    { id: "albums" as SearchTab, label: "Albums" },
+    { id: "artists" as SearchTab, label: "Artists" },
+    { id: "playlists" as SearchTab, label: "Playlists" },
+  ];
 
   const shouldShowTabs = searchQuery.trim().length >= MIN_SEARCH_LENGTH;
 
@@ -544,46 +441,32 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
-      <View style={styles.header}>
+      <View
+        style={[styles.header, { backgroundColor: theme.colors.background }]}
+      >
         {onBack && (
           <IconButton
             icon="arrow-left"
             size={24}
-            iconColor={theme.colors.onSurface}
             onPress={onBack}
             style={styles.backButton}
           />
         )}
         <Searchbar
-          placeholder="Artists, songs, or albums"
+          placeholder="Search songs, albums, artists..."
           onChangeText={setSearchQuery}
           value={searchQuery}
-          style={[
-            styles.searchbar,
-            onBack && styles.searchbarWithBack,
-            { backgroundColor: theme.colors.surfaceVariant },
-          ]}
+          style={styles.searchbar}
           inputStyle={styles.searchbarInput}
-          iconColor={theme.colors.onSurfaceVariant}
-          placeholderTextColor={theme.colors.onSurfaceVariant}
-          elevation={0}
-          right={() =>
-            searchQuery ? (
-              <IconButton
-                icon="close"
-                size={20}
-                iconColor={theme.colors.onSurfaceVariant}
-                onPress={() => setSearchQuery("")}
-              />
-            ) : (
-              <IconButton
-                icon="microphone"
-                size={20}
-                iconColor={theme.colors.onSurfaceVariant}
-                onPress={() => setIsVoiceModalVisible(true)}
-              />
-            )
-          }
+          icon="magnify"
+          clearIcon={searchQuery ? "close" : undefined}
+          right={() => (
+            <IconButton
+              icon="microphone"
+              size={20}
+              onPress={() => setIsVoiceModalVisible(true)}
+            />
+          )}
         />
       </View>
 
@@ -595,39 +478,26 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
             contentContainerStyle={styles.tabsContent}
           >
             {tabs.map((tab) => {
-              const tabResults = results[tab.id] || [];
-              const hasTabResults = tabResults.length > 0;
-              const isTabLoading = loadingStates[tab.id];
               const isTabActive = activeTab === tab.id;
-
               return (
                 <TouchableOpacity
                   key={tab.id}
-                  onPress={() => setActiveTab(isTabActive ? null : tab.id)}
+                  onPress={() => handleTabPress(tab.id)}
                   style={[
                     styles.tab,
-                    isTabActive && {
-                      backgroundColor: theme.colors.primary,
-                    },
-                    !hasTabResults &&
-                      !isTabLoading &&
-                      !isTabActive &&
-                      styles.tabDisabled,
+                    isTabActive && { backgroundColor: theme.colors.primary },
                   ]}
                   activeOpacity={0.7}
-                  disabled={!hasTabResults && !isTabLoading && !isTabActive}
                 >
                   <Text
                     variant="labelLarge"
                     style={[
                       styles.tabLabel,
                       {
-                        color: isTabActive ? "#000000" : theme.colors.onSurface,
+                        color: isTabActive
+                          ? theme.colors.onPrimary
+                          : theme.colors.onSurface,
                       },
-                      !hasTabResults &&
-                        !isTabLoading &&
-                        !isTabActive &&
-                        styles.tabLabelDisabled,
                     ]}
                   >
                     {tab.label}
@@ -645,10 +515,8 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
           styles.scrollContent,
           { paddingBottom: bottomPadding },
         ]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
       >
-        {renderContent()}
+        {renderContent}
       </ScrollView>
 
       <VoiceSearchModal
@@ -673,7 +541,6 @@ const styles = StyleSheet.create({
   backButton: { margin: 0 },
   searchbar: { flex: 1, borderRadius: 8, elevation: 0 },
   searchbarInput: { fontSize: 15, minHeight: 0, paddingVertical: 0 },
-  searchbarWithBack: { flex: 1 },
   tabsWrapper: { paddingHorizontal: 16, paddingBottom: 16 },
   tabsContent: { gap: 8, paddingRight: 16 },
   tab: {
@@ -684,14 +551,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.1)",
   },
-  tabDisabled: {
-    opacity: 0.4,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-  },
   tabLabel: { fontWeight: "600", letterSpacing: 0.25 },
-  tabLabelDisabled: {
-    opacity: 0.5,
-  },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 0 },
   recentSection: { paddingTop: 8 },
@@ -723,7 +583,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionHeaderText: { fontWeight: "700", fontSize: 20 },
-  sectionCount: { fontSize: 12, fontWeight: "500" },
   emptyState: {
     flex: 1,
     justifyContent: "center",
@@ -734,15 +593,6 @@ const styles = StyleSheet.create({
   emptyIcon: { margin: 0, marginBottom: 16, opacity: 0.3 },
   emptyTitle: { fontWeight: "600", marginBottom: 8, textAlign: "center" },
   emptySubtitle: { textAlign: "center", opacity: 0.7 },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingTop: 120,
-    paddingHorizontal: 32,
-  },
-  errorIcon: { margin: 0, marginBottom: 16 },
-  errorText: { color: "#ef4444", textAlign: "center", fontWeight: "600" },
   skeletonItem: {
     flexDirection: "row",
     paddingVertical: 8,

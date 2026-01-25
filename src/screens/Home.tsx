@@ -210,14 +210,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
   useEffect(() => {
     loadPreferences();
-    loadHomeData(selectedLanguage);
-  }, [loadPreferences, loadHomeData, selectedLanguage]);
+  }, [loadPreferences]);
+
+  const lastLoadedLanguage = useRef<string | null>(null);
 
   useEffect(() => {
-    if (selectedLanguage) {
-      loadHomeData(selectedLanguage);
-    }
-  }, [selectedLanguage, loadHomeData]);
+    if (!selectedLanguage) return;
+    if (lastLoadedLanguage.current === selectedLanguage) return;
+
+    lastLoadedLanguage.current = selectedLanguage;
+    loadHomeData(selectedLanguage);
+  }, [loadHomeData, selectedLanguage]);
 
   const handleTrackPress = useCallback(
     (track: Models.Song, allTracks: Models.Song[]) => {

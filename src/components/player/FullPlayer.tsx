@@ -220,11 +220,7 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
             <View style={styles.artworkContainer}>
               <View style={styles.artworkShadow}>
                 <Image
-                  source={{
-                    uri:
-                      currentSong.images?.[2]?.url ||
-                      currentSong.images?.[0]?.url,
-                  }}
+                  source={{ uri: currentSong.images?.[2]?.url }}
                   style={styles.artwork}
                   contentFit="cover"
                 />

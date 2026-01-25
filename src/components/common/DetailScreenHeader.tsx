@@ -45,7 +45,7 @@ const DetailScreenHeader: React.FC<DetailScreenHeaderProps> = ({
 
       {imageUrl && (
         <Image
-          source={{ uri: imageUrl }}
+          source={{ uri: imageUrl}}
           style={[styles.artwork, rounded && styles.artworkRounded]}
         />
       )}
