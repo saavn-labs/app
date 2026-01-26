@@ -499,7 +499,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
                       styles.tabLabel,
                       {
                         color: isTabActive
-                          ? theme.colors.primary
+                          ? theme.colors.background
                           : theme.colors.onSurface,
                       },
                     ]}
