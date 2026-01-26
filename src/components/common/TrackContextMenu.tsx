@@ -1,3 +1,13 @@
+import {
+  usePlayerStore,
+  useLibraryStore,
+  useSnackbarStore,
+  useDownloadsStore,
+} from "@/stores";
+import { formatShareMessage } from "@/utils/formatters";
+import { theme } from "@/utils";
+import { Models } from "@saavn-labs/sdk";
+
 import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Modal,
@@ -14,17 +24,9 @@ import {
   Portal,
   Surface,
   Text,
-  useTheme,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { Models } from "@saavn-labs/sdk";
-
-import { useDownloads } from "@/stores/downloadsStore";
-import { useLibraryStore } from "@/stores/libraryStore";
-import { usePlayerStore } from "@/stores/playerStore";
-import { useSnackbarStore } from "@/stores/snackbarStore";
-import { formatShareMessage } from "@/utils/formatters";
 
 interface TrackContextMenuProps {
   visible: boolean;
@@ -39,13 +41,12 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
   onDismiss,
   onComplete,
 }) => {
-  const theme = useTheme();
   const insets = useSafeAreaInsets();
 
   const { addToQueue, addNextInQueue } = usePlayerStore();
   const { collections, favorites, toggleFavorite, addToCollection } =
     useLibraryStore();
-  const { downloadTrack, isDownloaded, getProgress } = useDownloads();
+  const { downloadTrack, isDownloaded, getProgress } = useDownloadsStore();
   const showSnackbar = useSnackbarStore((state) => state.show);
 
   const [showCollections, setShowCollections] = useState(false);
@@ -329,7 +330,7 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
         visible={visible}
         onRequestClose={onDismiss}
         transparent
-        animationType="slide"
+        animationType="fade"
         statusBarTranslucent
       >
         <TouchableWithoutFeedback onPress={onDismiss}>
@@ -360,7 +361,7 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: "transparent",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
   },
   menu: {

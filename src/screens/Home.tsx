@@ -1,9 +1,9 @@
 import { GenericMediaItem, TrackItem } from "@/components";
 import { AUDIO_QUALITY, COLORS, UI_CONFIG } from "@/constants";
-import { useHomeStore } from "@/stores/homeStore";
-import { usePlayerStore } from "@/stores/playerStore";
-import { getScreenPaddingBottom } from "@/utils/designSystem";
+import { usePlayerStore, useHomeStore } from "@/stores";
+import { getScreenPaddingBottom } from "@/utils";
 import { Models } from "@saavn-labs/sdk";
+
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, {
@@ -60,7 +60,6 @@ const LANGUAGES = ["hindi", "english", "punjabi", "tamil", "telugu"];
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const QUICK_PICK_ITEM_WIDTH = (SCREEN_WIDTH - 32 - 12) / 2;
 
-// Offline Fallback Component
 const OfflineFallback: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
   <View style={styles.offlineContainer}>
     <IconButton icon="wifi-off" size={64} iconColor="#666" />
@@ -258,7 +257,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       } else {
         setShowOffline(false);
       }
-    })
+    });
   }, [sections.length, loading]);
 
   useEffect(() => {

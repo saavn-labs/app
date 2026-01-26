@@ -1,7 +1,8 @@
+import { theme } from "@/utils";
 import { Image } from "expo-image";
 import React, { memo } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
-import { Text, useTheme } from "react-native-paper";
+import { Text } from "react-native-paper";
 
 export type MediaType = "album" | "artist" | "playlist" | "collection";
 
@@ -23,8 +24,6 @@ interface GenericMediaItemProps {
 
 const GenericMediaItem: React.FC<GenericMediaItemProps> = memo(
   ({ data, type, onPress, horizontal = false, testID }) => {
-    const theme = useTheme();
-
     const getTitle = (): string => {
       return data.title || data.name || "Unknown";
     };
@@ -47,7 +46,7 @@ const GenericMediaItem: React.FC<GenericMediaItemProps> = memo(
           testID={testID}
         >
           <Image
-            source={{ uri: imageUrl}}
+            source={{ uri: imageUrl }}
             style={imageStyle}
             contentFit="cover"
             transition={200}
@@ -83,7 +82,7 @@ const GenericMediaItem: React.FC<GenericMediaItemProps> = memo(
         testID={testID}
       >
         <Image
-          source={{ uri: imageUrl}}
+          source={{ uri: imageUrl }}
           style={imageStyle}
           contentFit="cover"
           transition={200}

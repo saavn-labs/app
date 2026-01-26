@@ -1,10 +1,18 @@
 import { GenericMediaItem, TrackItem } from "@/components";
 import { UI_CONFIG } from "@/constants";
+import { useSearchStore } from "@/stores";
 import { useCurrentSong, usePlayerActions } from "@/stores/playerStore";
-import { useSearchStore } from "@/stores/searchStore";
-import { getScreenPaddingBottom } from "@/utils/designSystem";
+import { theme, getScreenPaddingBottom } from "@/utils";
+import VoiceSearchModal from "@/components/search/VoiceSearchModal";
 import { Models } from "@saavn-labs/sdk";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Animated,
   ScrollView,
@@ -12,9 +20,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { IconButton, Searchbar, Text, useTheme } from "react-native-paper";
+import { IconButton, Searchbar, Text } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import VoiceSearchModal from "../components/search/VoiceSearchModal";
 
 type SearchTab = "songs" | "albums" | "artists" | "playlists";
 
@@ -70,7 +77,6 @@ const RecentSearchItem = React.memo(
     onPress: () => void;
     onRemove: () => void;
   }) => {
-    const theme = useTheme();
     return (
       <TouchableOpacity
         style={styles.recentItem}
@@ -100,7 +106,6 @@ const RecentSearchItem = React.memo(
 );
 
 const EmptyState = React.memo(({ query }: { query: string }) => {
-  const theme = useTheme();
   return (
     <View style={styles.emptyState}>
       <IconButton
@@ -125,7 +130,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
   onPlaylistPress,
   onBack,
 }) => {
-  const theme = useTheme();
   const { playSong } = usePlayerActions();
   const currentSong = useCurrentSong();
   const insets = useSafeAreaInsets();
@@ -196,12 +200,12 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
     (track: Models.Song) => playSong(track),
     [playSong],
   );
-  
+
   const handleRecentSearchSelect = useCallback(
     (search: string) => setSearchQuery(search),
     [setSearchQuery],
   );
-  
+
   const handleTabPress = useCallback(
     (tabId: SearchTab) => setActiveTab(activeTab === tabId ? null : tabId),
     [activeTab, setActiveTab],
@@ -495,7 +499,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({
                       styles.tabLabel,
                       {
                         color: isTabActive
-                          ? theme.colors.onPrimary
+                          ? theme.colors.primary
                           : theme.colors.onSurface,
                       },
                     ]}

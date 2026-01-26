@@ -1,9 +1,10 @@
-import { formatTrackSubtitle } from "@/utils/formatters";
-import { MaterialIcons } from "@expo/vector-icons";
+import { theme, formatTrackSubtitle } from "@/utils";
 import { Models } from "@saavn-labs/sdk";
+
+import { MaterialIcons } from "@expo/vector-icons";
 import React, { memo, useCallback, useMemo, useState } from "react";
 import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
-import { Text, useTheme } from "react-native-paper";
+import { Text } from "react-native-paper";
 import TrackContextMenu from "../common/TrackContextMenu";
 
 interface TrackItemProps {
@@ -25,7 +26,6 @@ const TrackItem: React.FC<TrackItemProps> = ({
   isActive = false,
   onMenuAction,
 }) => {
-  const theme = useTheme();
   const [showMenu, setShowMenu] = useState(false);
 
   const subtitle = useMemo(() => formatTrackSubtitle(track), [track]);
@@ -73,7 +73,7 @@ const TrackItem: React.FC<TrackItemProps> = ({
         ) : showArtwork && track.images?.[0]?.url ? (
           <View style={styles.artworkContainer}>
             <Image
-              source={{ uri: track.images[1].url}}
+              source={{ uri: track.images[1].url }}
               style={styles.artwork}
               resizeMode="cover"
             />

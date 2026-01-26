@@ -23,7 +23,7 @@ interface DownloadsState {
   getProgress: (songId: string) => DownloadProgress | null;
 }
 
-export const useDownloads = create<DownloadsState>((set, get) => ({
+export const useDownloadsStore = create<DownloadsState>((set, get) => ({
   downloads: [],
   activeDownloads: new Map(),
   isLoading: false,

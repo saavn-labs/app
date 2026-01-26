@@ -1,6 +1,7 @@
+import { theme } from "@/utils";
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import { Button, Text, useTheme } from "react-native-paper";
+import { Button, Text } from "react-native-paper";
 
 interface EmptyStateProps {
   icon?: string;
@@ -16,8 +17,6 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   actionLabel,
   onAction,
 }) => {
-  const theme = useTheme();
-
   return (
     <View style={styles.container}>
       <Text variant="headlineSmall" style={styles.title}>

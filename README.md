@@ -1,235 +1,388 @@
-# Saavn Music
+<div align="center">
 
-**A modern JioSaavn client built with Expo & React Native**
+# <div style="display: flex; align-items: center; justify-content: center; gap: 10px"><img src="assets/images/icon.png" alt="Saavn Music Banner" width="40" style="border-radius: 5px;"/> Saavn Music </div>
 
-<p align="center">
-  <img src="assets/images/banner.png" alt="Saavn Music banner" />
-</p>
+### A Modern, High-Performance JioSaavn Client
 
-Saavn Music is a **full-featured music streaming application** built using **Expo, React Native, and the New Architecture**, powered by **`@saavn-labs/sdk`** and **`react-native-track-player`**.
+[![React Native](https://img.shields.io/badge/React%20Native-0.81-61DAFB?style=flat&logo=react&logoColor=white)](https://reactnative.dev/)
+[![Expo](https://img.shields.io/badge/Expo-SDK%2054-000020?style=flat&logo=expo&logoColor=white)](https://expo.dev/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?style=flat&logo=android&logoColor=white)](https://www.android.com/)
 
-The app focuses on **performance**, **clean architecture**, and **a polished playback experience**, including background audio, queue management, and rich player UIs.
+<img src="assets/images/banner.jpg" alt="Saavn Music Banner" width="800"/>
 
----
+**Experience music streaming reimagined with cutting-edge technology and thoughtful design.**
 
-## ✨ Highlights
+[Features](#-features) • [Screenshots](#-screenshots) • [Quick Start](#-quick-start) • [Troubleshooting](#-troubleshooting) • [Legal Notice](#-legal-notice)
 
-* 🚀 **Modern stack**: Expo SDK 54, React Native 0.81, React 19
-* 🎧 **Robust audio playback** with background support
-* 🧠 **Clean state management** using Zustand + MMKV
-* 🎨 **Dynamic theming** based on album artwork
-* 🗣️ **Voice search** using on-device speech recognition
-* 🧩 **Modular architecture** with clear separation of concerns
-* 🧪 **Development build workflow** (no Expo Go limitations)
+</div>
 
 ---
 
-## 🧭 Features
+## 📖 Overview
 
-### Browsing & Discovery
+**Saavn Music** is a full-featured music streaming application that demonstrates modern mobile development best practices. Built with **Expo**, **React Native's New Architecture**, and powered by **@saavn-labs/sdk** and **react-native-track-player**, it delivers a premium music experience with exceptional performance and a polished user interface.
 
-* Home feed with curated content
-* Powerful search for songs, albums, artists, and playlists
-* Dedicated Library and History screens
+### Why Saavn Music?
 
-### Playback Experience
-
-* Background audio playback
-* Queue management (play next, add to queue)
-* Seek, skip, repeat, and media controls
-* Mini-player and immersive full-screen player
-* Android media notification & lock-screen controls
-
-### UI & UX
-
-* Artwork-driven dynamic colors
-* Smooth transitions and responsive layouts
-* Snackbar system for global feedback
-* Optimized for both phones and tablets
-
-### Performance & Storage
-
-* Fast persistent storage using `react-native-mmkv`
-* Efficient caching and minimal re-renders
-* Designed around RN New Architecture constraints
+- 🏗️ **Production-Ready Architecture** – Built for scale and maintainability
+- ⚡ **Blazing Fast** – Optimized with MMKV storage and efficient state management
+- 🎨 **Beautiful UI/UX** – Dynamic theming and smooth animations
+- 🔊 **Professional Playback** – Background audio, queue management, and rich controls
+- 🧪 **Modern Stack** – React 19, Expo SDK 54, React Native 0.81
 
 ---
 
-## 🖼️ Screenshots
+## ✨ Features
 
-| Home                                        | Album                                         | Player                                          |
-| ------------------------------------------- | --------------------------------------------- | ----------------------------------------------- |
-| ![Home](assets/images/screenshots/home.png) | ![Album](assets/images/screenshots/album.png) | ![Player](assets/images/screenshots/player.png) |
+<table>
+  <tr>
+    <td width="50%">
+      
+### 🎧 **Audio Experience**
+      
+- Background audio playback with foreground service
+- Seamless queue management (play next, add to queue)
+- Full media controls (seek, skip, repeat, shuffle)
+- Android lock-screen & notification controls
+- Gapless playback support
+- Audio focus handling
+      
+    </td>
+    <td width="50%">
+      
+### 🔍 **Discovery & Search**
+      
+- Powerful search across songs, albums, artists, playlists
+- Voice search with on-device speech recognition
+- Curated home feed with personalized content
+- Trending charts and new releases
+- Genre-based browsing
+- Smart recommendations
+      
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      
+### 📚 **Library Management**
+      
+- Favorites and collections
+- Listening history tracking
+- Offline downloads support
+- Custom playlist creation
+- Recently played quick access
+- Library sync and backup
+      
+    </td>
+    <td width="50%">
+      
+### 🎨 **UI & Design**
+      
+- Dynamic color theming from album artwork
+- Mini-player with gesture controls
+- Immersive full-screen player
+- Smooth transitions and animations
+- Tablet-optimized layouts
+- Dark mode support
+- Global snackbar feedback system
+      
+    </td>
+  </tr>
+</table>
 
 ---
 
-## 🛠️ Tech Stack
+## 📱 Screenshots
 
-| Category   | Tech                           |
-| ---------- | ------------------------------ |
-| Framework  | Expo SDK 54, React Native 0.81 |
-| Language   | TypeScript                     |
-| Navigation | Expo Router                    |
-| Playback   | react-native-track-player      |
-| Data       | @saavn-labs/sdk                |
-| State      | Zustand                        |
-| Storage    | react-native-mmkv              |
-| UI         | react-native-paper             |
-| Theming    | react-native-image-colors      |
+### Core Experience
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="assets/images/screenshots/home.png" alt="Home Screen" width="250"/>
+      <br/>
+      <b>Home Feed</b>
+      <br/>
+      <sub>Trending content and suggestions</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="assets/images/screenshots/full-player.png" alt="Full Player" width="250"/>
+      <br/>
+      <b>Full Player</b>
+      <br/>
+      <sub>Immersive playback experience</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="assets/images/screenshots/downloads.png" alt="Downloads" width="250"/>
+      <br/>
+      <b>Downloads</b>
+      <br/>
+      <sub>Offline content management</sub>
+    </td>
+  </tr>
+</table>
+
+### Search & Discovery
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="assets/images/screenshots/search-interface.png" alt="Search" width="250"/>
+      <br/>
+      <b>Search Interface</b>
+      <br/>
+      <sub>Full text search over categories</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="assets/images/screenshots/search-results.png" alt="Search Results" width="250"/>
+      <br/>
+      <b>Search Results</b>
+      <br/>
+      <sub>Categorized results with quick filters</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="assets/images/screenshots/search-voice.png" alt="Voice Search" width="250"/>
+      <br/>
+      <b>Voice Search</b>
+      <br/>
+      <sub>On-Device Voice Search</sub>
+    </td>
+  </tr>
+</table>
+
+### Media Details
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="assets/images/screenshots/details-album.png" alt="Album Details" width="250"/>
+      <br/>
+      <b>Album View</b>
+      <br/>
+      <sub>Complete album information</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="assets/images/screenshots/details-artist.png" alt="Artist Details" width="250"/>
+      <br/>
+      <b>Artist Profile</b>
+      <br/>
+      <sub>Top tracks & discography</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="assets/images/screenshots/details-playlist.png" alt="Playlist Details" width="250"/>
+      <br/>
+      <b>Playlist View</b>
+      <br/>
+      <sub>Curated & custom playlists</sub>
+    </td>
+  </tr>
+</table>
+
+### Library & Collections
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="assets/images/screenshots/library-favorites.png" alt="Favorites" width="250"/>
+      <br/>
+      <b>Favorites</b>
+      <br/>
+      <sub>Liked songs & albums</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="assets/images/screenshots/library-collections-1.png" alt="Collections" width="250"/>
+      <br/>
+      <b>Collections</b>
+      <br/>
+      <sub>Organized library sections</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="assets/images/screenshots/library-collections-2.png" alt="Collections" width="250"/>
+      <br/>
+      <b>Custom Collection</b>
+      <br/>
+      <sub>User-defined music collections</sub>
+    </td>
+  </tr>
+</table>
+
+### Bonus Features
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="assets/images/screenshots/track-menu.png" alt="Track Menu" width="250"/>
+      <br/>
+      <b>Track Menu</b>
+      <br/>
+      <sub>Context menu with rich actions</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="assets/images/screenshots/audio-quality.png" alt="Audio Quality" width="250"/>
+      <br/>
+      <b>Audio Quality</b>
+      <br/>
+      <sub>High fidelity playback options</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="assets/images/screenshots/history.png" alt="History" width="250"/>
+      <br/>
+      <b>History</b>
+      <br/>
+      <sub>List of recently played tracks</sub>
+    </td>
+  </tr>
+</table>
 
 ---
 
-## 🗂️ Project Structure
-
-```txt
-app/                     # Expo Router routes
-  (tabs)/                # Home, Search, Library, History
-  album/[id].tsx         # Album detail screen
-  artist/[id].tsx        # Artist detail screen
-  playlist/[id].tsx      # Playlist detail screen
-  _layout.tsx             # Root layout
-
-src/
-  components/            # Reusable UI components
-  services/              # Domain services (Player, Queue, Search, Storage)
-  stores/                # Zustand stores
-  screens/               # Screen-level containers
-  utils/                 # Helpers (theming, formatting, cache)
-  constants/             # Shared constants
-  types/                 # Global TypeScript types
-
-android/                 # Native Android project
-playback-service.js      # Track Player service entrypoint
-```
-
----
-
-## ⚡ Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 
-* Node.js **18+**
-* npm, yarn, or bun
-* Java JDK + Android SDK
-* Android device or emulator
+Before you begin, ensure you have the following installed:
 
-> ⚠️ **Important**
-> This project uses native modules. **Expo Go is not supported**.
-> You must use a **development build (dev client)**.
+| Requirement                 | Version          | Download                                                          |
+| --------------------------- | ---------------- | ----------------------------------------------------------------- |
+| **Node.js**                 | 18.x or higher   | [nodejs.org](https://nodejs.org/)                                 |
+| **Java JDK**                | 17 (recommended) | [Oracle JDK](https://www.oracle.com/java/technologies/downloads/) |
+| **Android SDK**             | Latest           | Via Android Studio                                                |
+| **Android Device/Emulator** | API 21+          | [Android Studio](https://developer.android.com/studio)            |
 
----
+> **⚠️ Important Notice**
+>
+> This project uses native modules and cannot run in **Expo Go**. You must build and run a **development client**.
 
-### Install Dependencies
+### Installation
+
+1. **Clone the repository**
 
 ```bash
+git clone https://github.com/saavn-labs/saavn-music.git
+cd saavn-music
+```
+
+2. **Install dependencies**
+
+```bash
+# Using npm
 npm install
-# or
+
+# Using yarn
 yarn install
-# or
+
+# Using bun
 bun install
 ```
 
----
-
-### Run on Android (Development Client)
+3. **Build and run development client**
 
 ```bash
-# Build & install the dev client
+# Build and install on connected Android device/emulator
 npm run android
 
-# Start Metro for the dev client
+# Start the Metro bundler
 npx expo start --dev-client
 ```
 
-Open the installed dev client app and connect to Metro.
+4. **Launch the app**
+
+Open the installed development client on your device and it will automatically connect to Metro.
 
 ---
 
-## 📜 Available Scripts
+## 🐛 Troubleshooting
 
-| Script            | Description                             |
-| ----------------- | --------------------------------------- |
-| `npm run start`   | Start Metro bundler                     |
-| `npm run android` | Build & run Android dev client          |
-| `npm run ios`     | Build & run iOS dev client (macOS only) |
-| `npm run lint`    | Run ESLint                              |
+### Common Issues
 
----
+<details>
+<summary><b>App crashes on launch</b></summary>
 
-## ⚙️ Configuration
-
-* **App metadata & plugins**: `app.json`
-* **Assets**: `assets/images`
-* **Playback service**: `playback-service.js`
-* **Routes**: `app/` (Expo Router)
-
-Environment variables should be:
-
-* Typed in `expo-env.d.ts`
-* Read via `expo-constants` or your config utility
-
----
-
-## 🚀 Building with EAS
+**Solution:**
 
 ```bash
-npm install -g eas-cli
-eas login
-eas build:configure
+# Rebuild the development client
+npm run android
+
+# Clear Metro cache
+npx expo start -c
 ```
 
-### Build Profiles
+</details>
+
+<details>
+<summary><b>No audio playback</b></summary>
+
+**Possible causes:**
+
+- Development client not properly installed
+- Android audio focus not granted
+- Service not registered in `AndroidManifest.xml`
+
+**Solution:**
 
 ```bash
-# Development
-eas build -p android --profile development
-
-# Production
-eas build -p android --profile production
+# Reinstall with clean build
+cd android && ./gradlew clean
+cd .. && npm run android
 ```
 
-Build artifacts will be available in your Expo dashboard.
+</details>
+
+<details>
+<summary><b>Build errors with Gradle</b></summary>
+
+**Solution:**
+
+```bash
+# Clean Gradle cache
+cd android
+./gradlew clean
+rm -rf .gradle
+cd ..
+
+# Rebuild
+npm run android
+```
+
+</details>
+
+<details>
+<summary><b>Metro bundler issues</b></summary>
+
+**Solution:**
+
+```bash
+# Clear all caches
+npx expo start -c
+watchman watch-del-all  # If using watchman
+rm -rf node_modules && npm install
+```
+
+</details>
 
 ---
 
-## 🧩 Architecture Notes
+## 📄 Legal Notice
 
-* **Playback logic** is isolated in a service layer
-* UI reflects **intent**, not raw player state
-* Zustand stores are lean and domain-focused
-* Native constraints are handled explicitly (Android foreground service, audio focus)
+**This is an unofficial application.**
 
-This is not a demo app. It is structured for **long-term maintainability**.
+- Not affiliated with, endorsed by, or connected to JioSaavn
+- Does not host, store, or redistribute any copyrighted content
+- All media data and URLs are fetched from publicly accessible APIs
+- Usage compliance is the sole responsibility of the end user
 
----
-
-## 🧪 Troubleshooting
-
-* **App won’t run in Expo Go**
-  → Expected. Use a dev client.
-
-* **No audio / controls missing**
-  → Reinstall dev client with `npm run android`
-
-* **Metro issues**
-
-  ```bash
-  npx expo start -c
-  ```
-
-* **Gradle errors**
-  → Clean build or delete `android/.gradle`
+This project is intended for **educational and personal use only**. Please respect copyright laws and support artists by using official platforms.
 
 ---
 
-## 🤝 Contributing
+## License
 
-Contributions are welcome.
+**MIT** © 2025 Saavn Labs
 
-* Open issues for bugs or ideas
-* Submit PRs with improvements
-* UX and performance feedback is appreciated
+See [LICENSE](./LICENSE) for details.
 
 ---
 
-## 📄 License
+Built by **Saavn Labs** with a focus on correctness and longevity.

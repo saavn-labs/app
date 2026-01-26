@@ -1,3 +1,4 @@
+import { createColorGradient, extractAndUpdateColor } from "@/utils";
 import {
   useCurrentSong,
   useDominantColor,
@@ -7,7 +8,8 @@ import {
   useProgress,
   useSetDominantColor,
 } from "@/stores/playerStore";
-import { createColorGradient, extractAndUpdateColor } from "@/utils/colorUtils";
+import LoadingHeartbeat from "./LoadingHeartBeat";
+
 import { MaterialIcons } from "@expo/vector-icons";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { LinearGradient } from "expo-linear-gradient";
@@ -21,7 +23,6 @@ import {
 } from "react-native";
 import { Text } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import LoadingHeartbeat from "./LoadingHeartBeat";
 
 interface CompactPlayerProps {
   onPress: () => void;

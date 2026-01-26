@@ -1,13 +1,15 @@
-import { CompactPlayer, FullPlayer } from "@/components";
-import EmptyState from "@/components/common/EmptyState";
-import LoadingSpinner from "@/components/common/LoadingSpinner";
-import TrackItem from "@/components/items/TrackItem";
+import {
+  CompactPlayer,
+  FullPlayer,
+  EmptyState,
+  LoadingSpinner,
+  TrackItem,
+} from "@/components";
 import { COLORS } from "@/constants";
-import { useDetailStore } from "@/stores/detailStore";
-import { usePlayerStore } from "@/stores/playerStore";
-import { getScreenPaddingBottom } from "@/utils/designSystem";
-import { handleAsync } from "@/utils/errorHandler";
+import { usePlayerStore, useDetailStore } from "@/stores";
+import { handleAsync, theme, getScreenPaddingBottom } from "@/utils";
 import { Album, Artist, Models, Playlist } from "@saavn-labs/sdk";
+
 import { LinearGradient } from "expo-linear-gradient";
 import React, {
   useCallback,
@@ -27,7 +29,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { IconButton, Text, useTheme } from "react-native-paper";
+import { IconButton, Text } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -64,7 +66,6 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
   onBack,
   onAlbumPress,
 }) => {
-  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { playSong, currentSong } = usePlayerStore();
 

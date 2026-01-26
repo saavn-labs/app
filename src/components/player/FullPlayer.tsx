@@ -1,4 +1,4 @@
-import { useLibraryStore } from "@/stores/libraryStore";
+import { useLibraryStore } from "@/stores";
 import {
   useCurrentSong,
   useDominantColor,
@@ -10,11 +10,20 @@ import {
   useSetDominantColor,
   useUpcomingTracks,
 } from "@/stores/playerStore";
-import { createColorGradient, extractAndUpdateColor } from "@/utils/colorUtils";
-import { formatShareMessage, formatTime } from "@/utils/formatters";
+import {
+  theme,
+  formatTime,
+  createColorGradient,
+  extractAndUpdateColor,
+} from "@/utils";
+import { Models } from "@saavn-labs/sdk";
+
+import TrackItem from "../items/TrackItem";
+import LoadingHeartbeat from "./LoadingHeartBeat";
+import { TrackContextMenu } from "../common";
+
 import { MaterialIcons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
-import { Models } from "@saavn-labs/sdk";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -23,14 +32,11 @@ import {
   Dimensions,
   FlatList,
   Modal,
-  Share,
   StyleSheet,
   TouchableOpacity,
   View,
 } from "react-native";
 import { Text } from "react-native-paper";
-import TrackItem from "../items/TrackItem";
-import LoadingHeartbeat from "./LoadingHeartBeat";
 
 const { width } = Dimensions.get("window");
 
@@ -56,6 +62,7 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
 
   const [seekValue, setSeekValue] = useState(progress);
   const [isDragging, setIsDragging] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
@@ -129,15 +136,14 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
     await toggleFavoriteInStore(currentSong);
   }, [currentSong, toggleFavoriteInStore]);
 
-  const handleShare = useCallback(async () => {
-    if (!currentSong) return;
-    try {
-      const shareData = formatShareMessage(currentSong);
-      await Share.share(shareData);
-    } catch (error) {
-      console.error("Error sharing from FullPlayer:", error);
-    }
-  }, [currentSong]);
+  const handleMenuPress = useCallback((e: any) => {
+    e?.stopPropagation?.();
+    setShowMenu(true);
+  }, []);
+
+  const handleMenuDismiss = useCallback(() => {
+    setShowMenu(false);
+  }, []);
 
   const gradient = createColorGradient(dominantColor);
 
@@ -210,12 +216,22 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
                 </Text>
               </View>
               <TouchableOpacity
-                style={styles.headerButton}
-                activeOpacity={0.7}
-                onPress={handleShare}
+                onPress={handleMenuPress}
+                activeOpacity={0.6}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <MaterialIcons name="share" size={28} color="#ffffff" />
+                <MaterialIcons
+                  name="more-vert"
+                  size={36}
+                  color={theme.colors.onSurfaceVariant}
+                />
               </TouchableOpacity>
+
+              <TrackContextMenu
+                visible={showMenu}
+                track={currentSong}
+                onDismiss={handleMenuDismiss}
+              />
             </View>
 
             <View style={styles.artworkContainer}>

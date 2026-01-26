@@ -4,7 +4,6 @@ import { Portal, Snackbar } from "react-native-paper";
 
 import { SnackbarVariant, useSnackbarStore } from "@/stores/snackbarStore";
 import { getScreenPaddingBottom } from "@/utils";
-import { MaterialIcons } from "@expo/vector-icons";
 
 const variantConfig: Record<
   SnackbarVariant,

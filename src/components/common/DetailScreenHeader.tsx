@@ -1,7 +1,8 @@
 import { LinearGradient } from "expo-linear-gradient";
 import React, { memo } from "react";
 import { Dimensions, Image, StyleSheet, View } from "react-native";
-import { Button, IconButton, Text, useTheme } from "react-native-paper";
+import { Button, IconButton, Text } from "react-native-paper";
+import { theme } from "@/utils";
 
 const { width } = Dimensions.get("window");
 
@@ -28,8 +29,6 @@ const DetailScreenHeader: React.FC<DetailScreenHeaderProps> = ({
   onMore,
   rounded = false,
 }) => {
-  const theme = useTheme();
-
   return (
     <LinearGradient
       colors={["#404040", "#282828", "#121212"]}
@@ -45,7 +44,7 @@ const DetailScreenHeader: React.FC<DetailScreenHeaderProps> = ({
 
       {imageUrl && (
         <Image
-          source={{ uri: imageUrl}}
+          source={{ uri: imageUrl }}
           style={[styles.artwork, rounded && styles.artworkRounded]}
         />
       )}

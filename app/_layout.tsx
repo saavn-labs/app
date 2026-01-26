@@ -6,14 +6,14 @@ import * as SplashScreen from "expo-splash-screen";
 import { setStatusBarBackgroundColor, StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import {
-    Text as RNText,
-    TextInput as RNTextInput,
-    StyleSheet,
+  Text as RNText,
+  TextInput as RNTextInput,
+  StyleSheet,
 } from "react-native";
 import {
-    configureFonts,
-    MD3DarkTheme,
-    PaperProvider,
+  configureFonts,
+  MD3DarkTheme,
+  PaperProvider,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 

@@ -1,12 +1,13 @@
+import { theme } from "@/utils";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Animated,
-    Modal,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Animated,
+  Modal,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { IconButton, Text, useTheme } from "react-native-paper";
+import { IconButton, Text } from "react-native-paper";
 
 let SpeechModule: any = null;
 let useSpeechEvent: any = null;
@@ -30,7 +31,6 @@ const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
   onClose,
   onResult,
 }) => {
-  const theme = useTheme();
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);

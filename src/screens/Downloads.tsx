@@ -1,3 +1,9 @@
+import { TrackItem } from "@/components";
+import { LoadingSpinner } from "@/components/common";
+import { useDownloadsStore, useSnackbarStore } from "@/stores";
+import { usePlayerActions } from "@/stores/playerStore";
+import { theme } from "@/utils";
+
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -16,20 +22,12 @@ import {
   ProgressBar,
   Surface,
   Text,
-  useTheme,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialIcons } from "@expo/vector-icons";
 
-import { TrackItem } from "@/components";
-import { LoadingSpinner } from "@/components/common";
-import { useDownloads } from "@/stores/downloadsStore";
-import { usePlayerActions } from "@/stores/playerStore";
-import { useSnackbarStore } from "@/stores/snackbarStore";
-
 const Downloads: React.FC = () => {
-  const theme = useTheme();
   const insets = useSafeAreaInsets();
 
   const {
@@ -41,7 +39,7 @@ const Downloads: React.FC = () => {
     deleteDownload,
     deleteAllDownloads,
     cleanupOrphans,
-  } = useDownloads();
+  } = useDownloadsStore();
 
   const { playSong } = usePlayerActions();
   const showSnackbar = useSnackbarStore((state) => state.show);

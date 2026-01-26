@@ -1,6 +1,7 @@
+import { theme } from "@/utils";
 import React from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { Text, useTheme } from "react-native-paper";
+import { Text } from "react-native-paper";
 
 interface LoadingSpinnerProps {
   message?: string;
@@ -13,8 +14,6 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   size = "large",
   fullScreen = false,
 }) => {
-  const theme = useTheme();
-
   const containerStyle = fullScreen
     ? [styles.fullScreenContainer, { backgroundColor: theme.colors.background }]
     : styles.inlineContainer;

@@ -1,11 +1,11 @@
-import TrackItem from "@/components/items/TrackItem";
 import { COLORS } from "@/constants";
+import { TrackItem } from "@/components";
 import type { Collection } from "@/services";
-import { useLibraryStore } from "@/stores/libraryStore";
-import { usePlayerStore } from "@/stores/playerStore";
-import { getScreenPaddingBottom } from "@/utils/designSystem";
-import { MaterialIcons } from "@expo/vector-icons";
+import { useLibraryStore, usePlayerStore } from "@/stores";
+import { theme, getScreenPaddingBottom } from "@/utils";
 import { Models } from "@saavn-labs/sdk";
+
+import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, {
   useCallback,
@@ -25,10 +25,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { IconButton, Menu, Text, useTheme } from "react-native-paper";
+import { IconButton, Menu, Text } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-type LibraryTab = "songs" | "collections";
 type ModalType = "create" | "rename" | null;
 
 interface LibraryScreenProps {
@@ -46,8 +45,7 @@ const GRADIENT_COLORS = [
   ["#f97316", "#ea580c"],
 ];
 
-const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
-  const theme = useTheme();
+const LibraryScreen: React.FC<LibraryScreenProps> = () => {
   const insets = useSafeAreaInsets();
   const bottomPadding = getScreenPaddingBottom(true, true) + insets.bottom;
   const { playSong, currentSong } = usePlayerStore();

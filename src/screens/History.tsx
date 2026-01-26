@@ -1,3 +1,8 @@
+import { TrackItem } from "@/components";
+import { HistoryEntry, HistorySection } from "@/services";
+import { usePlayerStore, useHistoryStore, useSnackbarStore } from "@/stores";
+import { theme, getScreenPaddingBottom } from "@/utils";
+
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -10,17 +15,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
-  ActivityIndicator,
 } from "react-native";
-import { Appbar, Text, useTheme } from "react-native-paper";
+import { Appbar, Text } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-import TrackItem from "@/components/items/TrackItem";
-import { HistoryEntry, HistorySection } from "@/services";
-import { useHistoryStore } from "@/stores/historyStore";
-import { usePlayerStore } from "@/stores/playerStore";
-import { useSnackbarStore } from "@/stores/snackbarStore";
-import { getScreenPaddingBottom } from "@/utils/designSystem";
 
 const AnimatedSectionList = Animated.createAnimatedComponent(
   SectionList<HistoryEntry, { title: string; data: HistoryEntry[] }>,
@@ -30,7 +27,6 @@ const INITIAL_ITEMS_PER_SECTION = 10;
 const ITEMS_PER_PAGE = 20;
 
 export default function HistoryScreen() {
-  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const showSnackbar = useSnackbarStore((state) => state.show);

@@ -5,3 +5,5 @@ export { useLibraryStore } from "./libraryStore";
 export { usePlayerStore } from "./playerStore";
 export { useSearchStore } from "./searchStore";
 export { useUIStore } from "./uiStore";
+export { useSnackbarStore } from "./snackbarStore";
+export { useDownloadsStore } from "./downloadsStore";
