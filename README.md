@@ -1,149 +1,235 @@
-<!-- Banner (replace with your image or remove) -->
+# Saavn Music
+
+**A modern JioSaavn client built with Expo & React Native**
+
 <p align="center">
-	<img src="assets/images/banner.png" alt="Saavn Music" width="100%" />
+  <img src="assets/images/banner.png" alt="Saavn Music banner" />
 </p>
 
-# Saavn Music (Saavn Labs App)
+Saavn Music is a **full-featured music streaming application** built using **Expo, React Native, and the New Architecture**, powered by **`@saavn-labs/sdk`** and **`react-native-track-player`**.
 
-A full-featured Expo/React Native app to browse and play music from JioSaavn, powered by `@saavn-labs/sdk` and `react-native-track-player`.
+The app focuses on **performance**, **clean architecture**, and **a polished playback experience**, including background audio, queue management, and rich player UIs.
 
-## Features
+---
 
-- Rich browsing: Home, Search, Library, and History screens
-- Detail views: Albums, Artists, and Playlists with track lists
-- Powerful playback: background audio, queue, seek, and media controls
-- Player UIs: compact mini-player and immersive full-screen player
-- Voice search: hands-free queries via `expo-speech-recognition`
-- Dynamic theming: artwork-driven colors via `react-native-image-colors`
-- Fast state and caching: `zustand` + `react-native-mmkv`
-- New Architecture (RN 0.81) and Expo Router-based navigation
+## ✨ Highlights
 
-## Tech Stack
+* 🚀 **Modern stack**: Expo SDK 54, React Native 0.81, React 19
+* 🎧 **Robust audio playback** with background support
+* 🧠 **Clean state management** using Zustand + MMKV
+* 🎨 **Dynamic theming** based on album artwork
+* 🗣️ **Voice search** using on-device speech recognition
+* 🧩 **Modular architecture** with clear separation of concerns
+* 🧪 **Development build workflow** (no Expo Go limitations)
 
-- Expo SDK 54, React Native 0.81, React 19
-- TypeScript, Expo Router
-- `@saavn-labs/sdk` for JioSaavn data
-- `react-native-track-player` for audio playback
-- `zustand`, `react-native-mmkv` for state + storage
-- `react-native-image-colors` for UI theming
-- `react-native-paper` components
+---
 
-## Project Structure
+## 🧭 Features
 
-```
-app/                 # Expo Router routes
-	(tabs)/            # Bottom tab navigator (Home, Search, Library, History)
-	album/[id].tsx     # Album details
-	artist/[id].tsx    # Artist details
-	playlist/[id].tsx  # Playlist details
-	_layout.tsx        # Root layout
+### Browsing & Discovery
 
-src/
-	components/        # UI components (player, lists, common, search)
-	services/          # Data/services (Collection, History, Home, Player, Queue, Search, Storage)
-	stores/            # App state (Zustand stores)
-	screens/           # Screen containers
-	utils/             # Utilities (cache, theming, formatters, errors)
-	constants/, types/ # Shared constants and types
+* Home feed with curated content
+* Powerful search for songs, albums, artists, and playlists
+* Dedicated Library and History screens
 
-android/             # Native Android project
-playback-service.js  # Track Player service entrypoint
-```
+### Playback Experience
 
-## Quick Start
+* Background audio playback
+* Queue management (play next, add to queue)
+* Seek, skip, repeat, and media controls
+* Mini-player and immersive full-screen player
+* Android media notification & lock-screen controls
 
-### Prerequisites
+### UI & UX
 
-- Node.js 18+
-- npm or Yarn
-- Java JDK + Android SDK (for Android development build)
+* Artwork-driven dynamic colors
+* Smooth transitions and responsive layouts
+* Snackbar system for global feedback
+* Optimized for both phones and tablets
 
-This project uses native modules (e.g., Track Player, MMKV). Use a development build (dev client). Expo Go will not work.
+### Performance & Storage
 
-### Install
+* Fast persistent storage using `react-native-mmkv`
+* Efficient caching and minimal re-renders
+* Designed around RN New Architecture constraints
 
-```bash
-npm install
-# or
-yarn install
-```
+---
 
-### Run (Development Client)
-
-Android (recommended during development):
-
-```bash
-# 1) Build & install a dev client on your device/emulator
-npm run android
-
-# 2) Start Metro for dev client
-npx expo start --dev-client
-```
-
-Once Metro is up, open the dev client app and connect to the bundler (QR/code).
-
-### Scripts
-
-- `npm run start`: Start Metro bundler
-- `npm run android`: Build and run Android dev client
-- `npm run ios`: Build and run iOS dev client (on macOS)
-- `npm run lint`: Lint the project
-
-## Configuration
-
-- App metadata and plugins: see app.json
-- Icons and splash: assets/images/
-- Track Player service: playback-service.js (registered by the app on startup)
-- Expo Router routes live under app/
-
-If you add environment variables, type them in expo-env.d.ts and read them via `expo-constants` or your preferred config library.
-
-## Building with EAS
-
-Requires EAS CLI (see eas.json for profiles).
-
-```bash
-# Install EAS CLI if needed
-npm install -g eas-cli
-
-# Sign in and configure your project
-eas login
-eas build:configure
-
-# Android builds
-eas build -p android --profile development
-eas build -p android --profile production
-```
-
-Artifacts are available in your Expo account after builds complete.
-
-## Screenshots
+## 🖼️ Screenshots
 
 | Home                                        | Album                                         | Player                                          |
 | ------------------------------------------- | --------------------------------------------- | ----------------------------------------------- |
 | ![Home](assets/images/screenshots/home.png) | ![Album](assets/images/screenshots/album.png) | ![Player](assets/images/screenshots/player.png) |
 
-## Troubleshooting
+---
 
-- Using Expo Go: This app uses native modules; use a dev client instead.
-- No audio/controls: Ensure the dev client installed successfully and that Android permissions are granted (foreground service, audio settings). Reinstall with `npm run android` if needed.
-- Metro cache issues: try `npx expo start -c`.
-- Gradle hiccups on Android: Clean/rebuild from Android Studio or remove build caches in android/.
+## 🛠️ Tech Stack
 
-## Contributing
+| Category   | Tech                           |
+| ---------- | ------------------------------ |
+| Framework  | Expo SDK 54, React Native 0.81 |
+| Language   | TypeScript                     |
+| Navigation | Expo Router                    |
+| Playback   | react-native-track-player      |
+| Data       | @saavn-labs/sdk                |
+| State      | Zustand                        |
+| Storage    | react-native-mmkv              |
+| UI         | react-native-paper             |
+| Theming    | react-native-image-colors      |
 
-Contributions are welcome! Feel free to:
+---
 
-- Open an issue for bugs/ideas
-- Submit a PR with improvements
-- Share feedback on UX or performance
+## 🗂️ Project Structure
 
-## FAQ
+```txt
+app/                     # Expo Router routes
+  (tabs)/                # Home, Search, Library, History
+  album/[id].tsx         # Album detail screen
+  artist/[id].tsx        # Artist detail screen
+  playlist/[id].tsx      # Playlist detail screen
+  _layout.tsx             # Root layout
 
-- Does this work in Expo Go? No. Use a development build (dev client).
-- What powers playback? `react-native-track-player` with a service entrypoint in playback-service.js.
-- Where do routes live? Under app/ using Expo Router.
+src/
+  components/            # Reusable UI components
+  services/              # Domain services (Player, Queue, Search, Storage)
+  stores/                # Zustand stores
+  screens/               # Screen-level containers
+  utils/                 # Helpers (theming, formatting, cache)
+  constants/             # Shared constants
+  types/                 # Global TypeScript types
 
-## License
+android/                 # Native Android project
+playback-service.js      # Track Player service entrypoint
+```
 
-This repository may include a LICENSE file that governs usage. If none is present, assume the code is provided for educational/demonstration purposes; confirm with the repository owner before redistribution.
+---
+
+## ⚡ Quick Start
+
+### Prerequisites
+
+* Node.js **18+**
+* npm, yarn, or bun
+* Java JDK + Android SDK
+* Android device or emulator
+
+> ⚠️ **Important**
+> This project uses native modules. **Expo Go is not supported**.
+> You must use a **development build (dev client)**.
+
+---
+
+### Install Dependencies
+
+```bash
+npm install
+# or
+yarn install
+# or
+bun install
+```
+
+---
+
+### Run on Android (Development Client)
+
+```bash
+# Build & install the dev client
+npm run android
+
+# Start Metro for the dev client
+npx expo start --dev-client
+```
+
+Open the installed dev client app and connect to Metro.
+
+---
+
+## 📜 Available Scripts
+
+| Script            | Description                             |
+| ----------------- | --------------------------------------- |
+| `npm run start`   | Start Metro bundler                     |
+| `npm run android` | Build & run Android dev client          |
+| `npm run ios`     | Build & run iOS dev client (macOS only) |
+| `npm run lint`    | Run ESLint                              |
+
+---
+
+## ⚙️ Configuration
+
+* **App metadata & plugins**: `app.json`
+* **Assets**: `assets/images`
+* **Playback service**: `playback-service.js`
+* **Routes**: `app/` (Expo Router)
+
+Environment variables should be:
+
+* Typed in `expo-env.d.ts`
+* Read via `expo-constants` or your config utility
+
+---
+
+## 🚀 Building with EAS
+
+```bash
+npm install -g eas-cli
+eas login
+eas build:configure
+```
+
+### Build Profiles
+
+```bash
+# Development
+eas build -p android --profile development
+
+# Production
+eas build -p android --profile production
+```
+
+Build artifacts will be available in your Expo dashboard.
+
+---
+
+## 🧩 Architecture Notes
+
+* **Playback logic** is isolated in a service layer
+* UI reflects **intent**, not raw player state
+* Zustand stores are lean and domain-focused
+* Native constraints are handled explicitly (Android foreground service, audio focus)
+
+This is not a demo app. It is structured for **long-term maintainability**.
+
+---
+
+## 🧪 Troubleshooting
+
+* **App won’t run in Expo Go**
+  → Expected. Use a dev client.
+
+* **No audio / controls missing**
+  → Reinstall dev client with `npm run android`
+
+* **Metro issues**
+
+  ```bash
+  npx expo start -c
+  ```
+
+* **Gradle errors**
+  → Clean build or delete `android/.gradle`
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome.
+
+* Open issues for bugs or ideas
+* Submit PRs with improvements
+* UX and performance feedback is appreciated
+
+---
+
+## 📄 License

@@ -1,5 +1,3 @@
-import { MaterialIcons } from "@expo/vector-icons";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import {
   useCurrentSong,
   useDominantColor,
@@ -10,6 +8,8 @@ import {
   useSetDominantColor,
 } from "@/stores/playerStore";
 import { createColorGradient, extractAndUpdateColor } from "@/utils/colorUtils";
+import { MaterialIcons } from "@expo/vector-icons";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect } from "react";
 import {
@@ -21,6 +21,7 @@ import {
 } from "react-native";
 import { Text } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import LoadingHeartbeat from "./LoadingHeartBeat";
 
 interface CompactPlayerProps {
   onPress: () => void;
@@ -40,7 +41,7 @@ const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
   let tabBarHeight = 0;
   try {
     tabBarHeight = useBottomTabBarHeight();
-  } catch (e) {
+  } catch (error) {
     tabBarHeight = 0;
   }
 
@@ -115,12 +116,17 @@ const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
               }}
               style={styles.playButton}
               activeOpacity={0.8}
+              disabled={status === "loading"}
             >
-              <MaterialIcons
-                name={status === "playing" ? "pause" : "play-arrow"}
-                size={28}
-                color="#ffffff"
-              />
+              {status === "loading" ? (
+                <LoadingHeartbeat color="#ffffff" size={28} />
+              ) : (
+                <MaterialIcons
+                  name={status === "playing" ? "pause" : "play-arrow"}
+                  size={28}
+                  color="#ffffff"
+                />
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               onPress={(e) => {
@@ -129,6 +135,7 @@ const CompactPlayer: React.FC<CompactPlayerProps> = ({ onPress, style }) => {
               }}
               style={styles.nextButton}
               activeOpacity={0.8}
+              disabled={status === "loading"}
             >
               <MaterialIcons name="skip-next" size={34} color="#ffffff" />
             </TouchableOpacity>

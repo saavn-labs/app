@@ -14,10 +14,6 @@ export interface Collection {
   coverUrl?: string;
 }
 
-/**
- * CollectionService manages user-created playlists/collections
- * Handles CRUD operations and song management within collections
- */
 export class CollectionService {
   async getCollections(): Promise<Collection[]> {
     const cacheKey = COLLECTIONS_KEY;

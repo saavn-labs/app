@@ -1,9 +1,7 @@
 import HomeScreen from "@/screens/Home";
-import { useRouter } from "expo-router";
+import { router } from "expo-router";
 
 export default function HomeTab() {
-  const router = useRouter();
-
   return (
     <HomeScreen
       onAlbumPress={(id) => router.push(`/album/${id}`)}

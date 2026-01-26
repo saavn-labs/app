@@ -5,7 +5,14 @@ import { usePlayerStore } from "@/stores/playerStore";
 import { getScreenPaddingBottom } from "@/utils/designSystem";
 import { Models } from "@saavn-labs/sdk";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import { router } from "expo-router";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Animated,
   Dimensions,
@@ -24,8 +31,10 @@ import {
   Portal,
   RadioButton,
   Text,
+  Button,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Network from "expo-network";
 
 interface HomeScreenProps {
   onAlbumPress: (albumId: string) => void;
@@ -47,12 +56,41 @@ interface QuickPickItem {
 }
 
 const LANGUAGES = ["hindi", "english", "punjabi", "tamil", "telugu"];
-const SKELETON_QUICK_PICKS = 6;
-const SKELETON_HORIZONTAL_ITEMS = 5;
-const SKELETON_SONG_ITEMS = 5;
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const QUICK_PICK_ITEM_WIDTH = (SCREEN_WIDTH - 32 - 12) / 2;
+
+// Offline Fallback Component
+const OfflineFallback: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
+  <View style={styles.offlineContainer}>
+    <IconButton icon="wifi-off" size={64} iconColor="#666" />
+    <Text variant="headlineSmall" style={styles.offlineTitle}>
+      No Internet Connection
+    </Text>
+    <Text variant="bodyMedium" style={styles.offlineMessage}>
+      Please check your internet connection and try again.
+    </Text>
+    <View style={styles.offlineButtons}>
+      <Button
+        mode="contained"
+        onPress={onRetry}
+        style={styles.retryButton}
+        buttonColor={COLORS.PRIMARY}
+        textColor="#000"
+      >
+        Retry
+      </Button>
+      <Button
+        mode="outlined"
+        onPress={() => router.push("/downloads")}
+        style={styles.downloadsButton}
+        textColor="#fff"
+      >
+        View Downloads
+      </Button>
+    </View>
+  </View>
+);
 
 const SkeletonQuickPick: React.FC = React.memo(() => {
   const fadeAnim = useRef(new Animated.Value(0.3)).current;
@@ -201,12 +239,27 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     loadHomeData,
   } = useHomeStore();
 
+  const [isConnected, setIsConnected] = useState(true);
+  const [showOffline, setShowOffline] = useState(false);
+
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning";
     if (hour < 17) return "Good afternoon";
     return "Good evening";
   }, []);
+
+  useEffect(() => {
+    Network.addNetworkStateListener((state) => {
+      setIsConnected(state.isConnected ?? false);
+
+      if (!state.isConnected && sections.length === 0 && !loading) {
+        setShowOffline(true);
+      } else {
+        setShowOffline(false);
+      }
+    })
+  }, [sections.length, loading]);
 
   useEffect(() => {
     loadPreferences();
@@ -246,6 +299,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     },
     [setContentQuality],
   );
+
+  const handleRetry = useCallback(() => {
+    if (selectedLanguage) {
+      loadHomeData(selectedLanguage);
+    }
+  }, [selectedLanguage, loadHomeData]);
 
   const renderSkeletonQuickPicks = useCallback(
     () => (
@@ -435,6 +494,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     [renderSkeletonSongList, renderSkeletonHorizontalList],
   );
 
+  if (showOffline) {
+    return (
+      <View style={styles.container}>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor="transparent"
+          translucent
+        />
+        <OfflineFallback onRetry={handleRetry} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar
@@ -454,13 +526,22 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text variant="headlineMedium" style={styles.greeting}>
               {greeting}
             </Text>
-            <IconButton
-              icon="cog"
-              iconColor="#fff"
-              size={24}
-              onPress={() => setSettingsModalVisible(true)}
-              style={styles.settingsButton}
-            />
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <IconButton
+                icon="history"
+                iconColor="#fff"
+                size={24}
+                onPress={() => router.push("/history")}
+                style={styles.headerNavButton}
+              />
+              <IconButton
+                icon="cog"
+                iconColor="#fff"
+                size={24}
+                onPress={() => setSettingsModalVisible(true)}
+                style={styles.headerNavButton}
+              />
+            </View>
           </View>
 
           <TouchableOpacity
@@ -473,6 +554,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               What do you want to listen to?
             </Text>
           </TouchableOpacity>
+
+          {!isConnected && sections.length > 0 && (
+            <View style={styles.offlineBanner}>
+              <IconButton icon="wifi-off" size={16} iconColor="#ff9800" />
+              <Text style={styles.offlineBannerText}>
+                You're offline • Showing cached content
+              </Text>
+            </View>
+          )}
         </View>
       </LinearGradient>
 
@@ -484,7 +574,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           { paddingBottom: bottomPadding },
         ]}
       >
-        {renderLanguageChips}
+        {(loading || sections.length > 0) && renderLanguageChips}
 
         <View style={styles.section}>{renderQuickPicks()}</View>
 
@@ -580,7 +670,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 28,
   },
-  settingsButton: {
+  headerNavButton: {
     margin: 0,
   },
   searchButton: {
@@ -598,6 +688,21 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginLeft: -4,
   },
+  offlineBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 152, 0, 0.15)",
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 12,
+  },
+  offlineBannerText: {
+    color: "#ff9800",
+    fontSize: 13,
+    fontWeight: "600",
+    marginLeft: -4,
+  },
   languageChipsContainer: {
     marginBottom: 16,
   },
@@ -609,12 +714,16 @@ const styles = StyleSheet.create({
   chip: {
     backgroundColor: "#282828",
     borderRadius: 20,
+    height: 36,
+    justifyContent: "center",
+    marginRight: 8,
   },
   chipSelected: {
     backgroundColor: "#1db954",
   },
   chipText: {
     fontSize: 13,
+    lineHeight: 16,
     color: "#b3b3b3",
   },
   chipTextSelected: {
@@ -739,6 +848,35 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     marginHorizontal: 16,
     width: 160,
+  },
+  offlineContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
+  },
+  offlineTitle: {
+    color: "#fff",
+    fontWeight: "bold",
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  offlineMessage: {
+    color: "#b3b3b3",
+    textAlign: "center",
+    marginBottom: 32,
+  },
+  offlineButtons: {
+    gap: 12,
+    width: "100%",
+  },
+  retryButton: {
+    borderRadius: 25,
+  },
+  downloadsButton: {
+    borderRadius: 25,
+    borderColor: "#fff",
   },
   modalContainer: {
     backgroundColor: "#282828",

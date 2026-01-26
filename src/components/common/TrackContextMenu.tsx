@@ -1,11 +1,5 @@
-import { useLibraryStore } from "@/stores/libraryStore";
-import { usePlayerStore } from "@/stores/playerStore";
-import { formatShareMessage } from "@/utils/formatters";
-import { Models } from "@saavn-labs/sdk";
-import { useRouter } from "expo-router";
-import React, { memo, useCallback, useEffect, useState } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   Modal,
   Share,
   StyleSheet,
@@ -23,6 +17,14 @@ import {
   useTheme,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { router } from "expo-router";
+import { Models } from "@saavn-labs/sdk";
+
+import { useDownloads } from "@/stores/downloadsStore";
+import { useLibraryStore } from "@/stores/libraryStore";
+import { usePlayerStore } from "@/stores/playerStore";
+import { useSnackbarStore } from "@/stores/snackbarStore";
+import { formatShareMessage } from "@/utils/formatters";
 
 interface TrackContextMenuProps {
   visible: boolean;
@@ -38,60 +40,73 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
   onComplete,
 }) => {
   const theme = useTheme();
-  const router = useRouter();
-  const { addToQueue, addNextInQueue } = usePlayerStore();
-  const {
-    collections,
-    favorites,
-    loadLibrary,
-    toggleFavorite,
-    addToCollection,
-  } = useLibraryStore();
   const insets = useSafeAreaInsets();
-  const [showCollections, setShowCollections] = useState(false);
-  const [loading, setLoading] = useState(false);
 
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      await loadLibrary();
-    } catch (error) {
-      console.error("Error loading menu data:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [loadLibrary]);
+  const { addToQueue, addNextInQueue } = usePlayerStore();
+  const { collections, favorites, toggleFavorite, addToCollection } =
+    useLibraryStore();
+  const { downloadTrack, isDownloaded, getProgress } = useDownloads();
+  const showSnackbar = useSnackbarStore((state) => state.show);
+
+  const [showCollections, setShowCollections] = useState(false);
+
+  const downloaded = isDownloaded(track.id);
+  const downloadProgress = getProgress(track.id);
+  const isDownloading = downloadProgress?.status === "downloading";
 
   useEffect(() => {
-    if (visible) {
-      loadData();
-    } else {
+    if (!visible) {
       setShowCollections(false);
     }
-  }, [visible, track.id, loadData]);
+  }, [visible]);
+
+  const isFavorite = useMemo(
+    () => favorites.some((s) => s.id === track.id),
+    [favorites, track.id],
+  );
+
+  const subtitle = useMemo(() => {
+    if (track.subtitle) return track.subtitle;
+    const parts = [];
+    if (track.artists?.primary) {
+      const artistNames = track.artists.primary.map((a) => a.name).join(", ");
+      if (artistNames) parts.push(artistNames);
+    }
+    if (track.album?.title) parts.push(track.album.title);
+    return parts.join(" - ") || "Unknown";
+  }, [track]);
 
   const handleToggleFavorite = useCallback(async () => {
     try {
       await toggleFavorite(track);
+      showSnackbar({
+        message: isFavorite ? "Removed from favorites" : "Added to favorites",
+        variant: "success",
+      });
       onComplete?.();
       onDismiss();
     } catch (error) {
       console.error("Error toggling favorite:", error);
-      Alert.alert("Error", "Failed to update favorites");
+      showSnackbar({
+        message: "Failed to update favorites",
+        variant: "error",
+      });
     }
-  }, [track, onComplete, onDismiss, toggleFavorite]);
+  }, [track, onComplete, onDismiss, toggleFavorite, isFavorite, showSnackbar]);
 
   const handleAddToQueue = useCallback(() => {
     addToQueue(track);
+    showSnackbar({ message: "Added to queue", variant: "success" });
     onComplete?.();
     onDismiss();
-  }, [addToQueue, track, onComplete, onDismiss]);
+  }, [addToQueue, track, onComplete, onDismiss, showSnackbar]);
 
   const handlePlayNext = useCallback(() => {
     addNextInQueue(track);
+    showSnackbar({ message: "Will play next", variant: "success" });
     onComplete?.();
     onDismiss();
-  }, [addNextInQueue, track, onComplete, onDismiss]);
+  }, [addNextInQueue, track, onComplete, onDismiss, showSnackbar]);
 
   const handleAddToCollection = useCallback(
     async (collectionId: string) => {
@@ -101,14 +116,18 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
           throw new Error("Add to collection failed");
         }
         setShowCollections(false);
+        showSnackbar({ message: "Added to collection", variant: "success" });
         onComplete?.();
         onDismiss();
       } catch (error) {
         console.error("Error adding to collection:", error);
-        Alert.alert("Error", "Failed to add to collection");
+        showSnackbar({
+          message: "Failed to add to collection",
+          variant: "error",
+        });
       }
     },
-    [track, onComplete, onDismiss, addToCollection],
+    [track, onComplete, onDismiss, addToCollection, showSnackbar],
   );
 
   const handleShare = useCallback(async () => {
@@ -123,167 +142,169 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
 
   const handleGoToArtist = useCallback(() => {
     onDismiss();
-
     if (track.artists?.primary && track.artists.primary.length > 0) {
       const artistId = track.artists.primary[0].id;
       if (artistId) {
         router.push(`/artist/${artistId}`);
       }
     } else {
-      Alert.alert("Info", "Artist information not available");
+      showSnackbar({
+        message: "Artist information not available",
+        variant: "warning",
+      });
     }
-  }, [track, router, onDismiss]);
+  }, [track, router, onDismiss, showSnackbar]);
 
   const handleGoToAlbum = useCallback(() => {
     onDismiss();
     if (track.album?.id) {
       router.push(`/album/${track.album.id}`);
     } else {
-      Alert.alert("Info", "Album information not available");
+      showSnackbar({
+        message: "Album information not available",
+        variant: "warning",
+      });
     }
-  }, [track, router, onDismiss]);
+  }, [track, router, onDismiss, showSnackbar]);
 
-  const getSubtitle = useCallback(() => {
-    if (track.subtitle) return track.subtitle;
+  const handleDownload = useCallback(async () => {
+    try {
+      if (downloaded) {
+        showSnackbar({ message: "Already downloaded", variant: "info" });
+        onDismiss();
+        return;
+      }
 
-    const parts = [];
-    if (track.artists?.primary) {
-      const artistNames = track.artists.primary.map((a) => a.name).join(", ");
-      if (artistNames) parts.push(artistNames);
+      await downloadTrack(track);
+      showSnackbar({
+        message: `Downloading "${track.title}"`,
+        variant: "success",
+      });
+      onDismiss();
+    } catch (err) {
+      console.error("Download failed:", err);
+      const message =
+        err instanceof Error ? err.message : "Failed to download track";
+      showSnackbar({ message, variant: "error" });
     }
-    if (track.album?.title) parts.push(track.album.title);
-
-    return parts.join(" - ") || "Unknown";
-  }, [track]);
+  }, [track, downloaded, downloadTrack, onDismiss, showSnackbar]);
 
   const renderMainMenu = () => (
-    <View style={styles.menuContent}>
-      <View style={styles.header}>
-        <Text
-          variant="titleMedium"
-          numberOfLines={1}
-          style={styles.headerTitle}
-        >
+    <>
+      <Surface style={styles.header} elevation={0}>
+        <Text variant="titleMedium" style={styles.headerTitle}>
           {track.title}
         </Text>
         <Text
           variant="bodySmall"
-          numberOfLines={1}
           style={[
             styles.headerSubtitle,
             { color: theme.colors.onSurfaceVariant },
           ]}
         >
-          {getSubtitle()}
+          {subtitle}
         </Text>
-      </View>
+      </Surface>
       <Divider />
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color={theme.colors.primary} />
-        </View>
-      ) : (
-        <>
-          <List.Item
-            title={
-              favorites.some((s) => s.id === track.id)
-                ? "Remove from Favorites"
-                : "Add to Favorites"
-            }
-            left={(props) => (
-              <List.Icon
-                {...props}
-                icon={
-                  favorites.some((s) => s.id === track.id)
-                    ? "heart"
-                    : "heart-outline"
-                }
-                color={
-                  favorites.some((s) => s.id === track.id)
-                    ? theme.colors.primary
-                    : undefined
-                }
-              />
-            )}
-            onPress={handleToggleFavorite}
-            style={styles.listItem}
+      <List.Item
+        title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+        left={(props) => (
+          <List.Icon
+            {...props}
+            icon={isFavorite ? "heart" : "heart-outline"}
+            color={isFavorite ? theme.colors.primary : undefined}
           />
-          <List.Item
-            title="Add to Collection"
-            left={(props) => <List.Icon {...props} icon="playlist-plus" />}
-            right={(props) => <List.Icon {...props} icon="chevron-right" />}
-            onPress={() => setShowCollections(true)}
-            style={styles.listItem}
-          />
-          <List.Item
-            title="Add to Queue"
-            left={(props) => <List.Icon {...props} icon="playlist-music" />}
-            onPress={handleAddToQueue}
-            style={styles.listItem}
-          />
-          <List.Item
-            title="Play Next"
-            left={(props) => <List.Icon {...props} icon="playlist-play" />}
-            onPress={handlePlayNext}
-            style={styles.listItem}
-          />
-          <Divider />
-          <List.Item
-            title="Share"
-            left={(props) => <List.Icon {...props} icon="share-variant" />}
-            onPress={handleShare}
-            style={styles.listItem}
-          />
-          {track.artists?.primary && track.artists.primary.length > 0 && (
-            <List.Item
-              title="Go to Artist"
-              left={(props) => <List.Icon {...props} icon="account-music" />}
-              onPress={handleGoToArtist}
-              style={styles.listItem}
+        )}
+        onPress={handleToggleFavorite}
+        style={styles.listItem}
+      />
+      <List.Item
+        title="Add to Collection"
+        left={(props) => <List.Icon {...props} icon="playlist-plus" />}
+        right={(props) => <List.Icon {...props} icon="chevron-right" />}
+        onPress={() => setShowCollections(true)}
+        style={styles.listItem}
+      />
+      <List.Item
+        title="Add to Queue"
+        left={(props) => <List.Icon {...props} icon="playlist-music" />}
+        onPress={handleAddToQueue}
+        style={styles.listItem}
+      />
+      <List.Item
+        title="Play Next"
+        left={(props) => <List.Icon {...props} icon="skip-next" />}
+        onPress={handlePlayNext}
+        style={styles.listItem}
+      />
+      <List.Item
+        title="Share"
+        left={(props) => <List.Icon {...props} icon="share-variant" />}
+        onPress={handleShare}
+        style={styles.listItem}
+      />
+      <List.Item
+        title={downloaded ? "Downloaded" : "Download"}
+        left={(props) =>
+          isDownloading ? (
+            <ActivityIndicator size={24} style={{ marginLeft: 14 }} />
+          ) : (
+            <List.Icon
+              {...props}
+              icon={downloaded ? "check-circle" : "download"}
+              color={downloaded ? theme.colors.primary : undefined}
             />
-          )}
-          {track.album?.id && (
-            <List.Item
-              title="Go to Album"
-              left={(props) => <List.Icon {...props} icon="album" />}
-              onPress={handleGoToAlbum}
-              style={styles.listItem}
-            />
-          )}
-        </>
+          )
+        }
+        onPress={handleDownload}
+        disabled={isDownloading || downloaded}
+        style={styles.listItem}
+      />
+      {track.artists?.primary && track.artists.primary.length > 0 && (
+        <List.Item
+          title="Go to Artist"
+          left={(props) => <List.Icon {...props} icon="account-music" />}
+          onPress={handleGoToArtist}
+          style={styles.listItem}
+        />
       )}
-    </View>
+      {track.album?.id && (
+        <List.Item
+          title="Go to Album"
+          left={(props) => <List.Icon {...props} icon="album" />}
+          onPress={handleGoToAlbum}
+          style={styles.listItem}
+        />
+      )}
+    </>
   );
 
   const renderCollectionsMenu = () => (
-    <View style={styles.menuContent}>
-      <View style={[styles.header, styles.collectionsHeader]}>
-        <TouchableOpacity
-          onPress={() => setShowCollections(false)}
-          style={styles.backButton}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <List.Icon icon="arrow-left" />
-        </TouchableOpacity>
-        <Text variant="titleMedium">Add to Collection</Text>
-      </View>
+    <>
+      <Surface style={styles.header} elevation={0}>
+        <View style={styles.collectionsHeader}>
+          <TouchableOpacity
+            onPress={() => setShowCollections(false)}
+            style={styles.backButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <List.Icon icon="arrow-left" />
+          </TouchableOpacity>
+          <Text variant="titleMedium" style={styles.headerTitle}>
+            Add to Collection
+          </Text>
+        </View>
+      </Surface>
       <Divider />
       {collections.length === 0 ? (
         <View style={styles.emptyState}>
-          <List.Icon icon="music-box-multiple-outline" />
-          <Text
-            variant="bodyMedium"
-            style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}
-          >
+          <List.Icon icon="playlist-music-outline" />
+          <Text variant="bodyMedium" style={styles.emptyText}>
             No collections yet
           </Text>
           <Text
             variant="bodySmall"
-            style={{
-              color: theme.colors.onSurfaceVariant,
-              textAlign: "center",
-            }}
+            style={{ color: theme.colors.onSurfaceVariant }}
           >
             Create one in Library to organize your music
           </Text>
@@ -293,23 +314,22 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
           <List.Item
             key={collection.id}
             title={collection.name}
-            description={`${collection.songs.length} song${collection.songs.length !== 1 ? "s" : ""}`}
-            left={(props) => <List.Icon {...props} icon="music-box-multiple" />}
+            left={(props) => <List.Icon {...props} icon="playlist-music" />}
             onPress={() => handleAddToCollection(collection.id)}
             style={styles.listItem}
           />
         ))
       )}
-    </View>
+    </>
   );
 
   return (
     <Portal>
       <Modal
         visible={visible}
-        transparent
-        animationType="fade"
         onRequestClose={onDismiss}
+        transparent
+        animationType="slide"
         statusBarTranslucent
       >
         <TouchableWithoutFeedback onPress={onDismiss}>
@@ -319,13 +339,15 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
                 style={[
                   styles.menu,
                   {
-                    backgroundColor: theme.colors.elevation.level2,
                     paddingBottom: insets.bottom,
+                    backgroundColor: theme.colors.surface,
                   },
                 ]}
-                elevation={5}
+                elevation={4}
               >
-                {showCollections ? renderCollectionsMenu() : renderMainMenu()}
+                <View style={styles.menuContent}>
+                  {showCollections ? renderCollectionsMenu() : renderMainMenu()}
+                </View>
               </Surface>
             </TouchableWithoutFeedback>
           </View>
@@ -338,7 +360,7 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    backgroundColor: "transparent",
     justifyContent: "flex-end",
   },
   menu: {
@@ -370,10 +392,6 @@ const styles = StyleSheet.create({
   },
   listItem: {
     paddingVertical: 4,
-  },
-  loadingContainer: {
-    padding: 24,
-    alignItems: "center",
   },
   emptyState: {
     padding: 32,

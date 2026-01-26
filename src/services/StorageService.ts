@@ -5,10 +5,6 @@ import { Models } from "@saavn-labs/sdk";
 
 type AudioQuality = keyof typeof AUDIO_QUALITY;
 
-/**
- * StorageService handles all MMKV storage operations with caching
- * Manages favorites, recent searches, and user preferences
- */
 export class StorageService {
   async getFavorites(): Promise<Models.Song[]> {
     const cacheKey = STORAGE_KEYS.FAVORITES;

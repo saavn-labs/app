@@ -26,27 +26,15 @@ export const usePlayerStore = create<PlayerStore>()(
   persist(
     (set, get) => {
       playerService.setStateUpdater((updates) => {
-        if (__DEV__) {
-          console.log(
-            "[PlayerStore] Update from PlayerService:",
-            Object.keys(updates),
-          );
-        }
         set((state) => ({ ...state, ...updates }));
       });
 
       queueService.setStateUpdater((updates) => {
-        if (__DEV__) {
-          console.log(
-            "[PlayerStore] Update from QueueService:",
-            Object.keys(updates),
-          );
-        }
         set((state) => ({ ...state, ...updates }));
       });
 
       return {
-        status: "idle",
+        status: "paused",
         currentSong: null,
         upcomingTracks: [],
         progress: 0,
@@ -63,7 +51,7 @@ export const usePlayerStore = create<PlayerStore>()(
             await playerService.play(song, queue);
           } catch (error) {
             console.error("[PlayerStore] playSong error:", error);
-            set({ status: "error" });
+            set({ status: "paused" });
           }
         },
 

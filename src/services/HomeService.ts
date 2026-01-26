@@ -7,10 +7,6 @@ export interface HomeData {
   trendingSongs: Awaited<ReturnType<typeof Song.getTrending>>;
 }
 
-/**
- * HomeService fetches and manages home screen content
- * Handles trending content and user preferences
- */
 export class HomeService {
   async fetchHomeData(language: string): Promise<HomeData> {
     const cacheKey = `home_${language}`;

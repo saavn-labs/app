@@ -67,10 +67,10 @@ export default function TabLayout() {
         />
 
         <Tabs.Screen
-          name="history"
+          name="downloads"
           options={{
             tabBarIcon: ({ color }) => (
-              <MaterialCommunityIcons name="history" color={color} size={30} />
+              <MaterialCommunityIcons name="download" color={color} size={30} />
             ),
           }}
         />

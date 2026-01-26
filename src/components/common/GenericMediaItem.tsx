@@ -1,9 +1,3 @@
-/**
- * Generic Media Item Component
- * Unified component for albums, artists, playlists, collections
- * Eliminates redundancy and improves maintainability
- */
-
 import { Image } from "expo-image";
 import React, { memo } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";

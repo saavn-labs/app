@@ -78,12 +78,10 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
   const loadLibraryData = useCallback(async () => {
     const success = await loadLibrary();
     if (!success) {
-      if (__DEV__) {
-        console.error(
-          "[LibraryScreen.loadLibraryData]",
-          "Failed to load library",
-        );
-      }
+      console.error(
+        "[LibraryScreen.loadLibraryData]",
+        "Failed to load library",
+      );
     }
   }, [loadLibrary]);
 
@@ -119,12 +117,10 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
 
       if (!created) {
         Alert.alert("Error", "Failed to create collection");
-        if (__DEV__) {
-          console.error(
-            "[LibraryScreen.handleCreateCollection]",
-            "create failed",
-          );
-        }
+        console.error(
+          "[LibraryScreen.handleCreateCollection]",
+          "create failed",
+        );
         return;
       }
 
@@ -136,9 +132,7 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
         "Error",
         error instanceof Error ? error.message : "Failed to create collection",
       );
-      if (__DEV__) {
-        console.error("[LibraryScreen.handleCreateCollection]", error);
-      }
+      console.error("[LibraryScreen.handleCreateCollection]", error);
     }
   }, [collectionName, createCollection, loadLibraryData]);
 
@@ -153,12 +147,10 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
 
       if (!success) {
         Alert.alert("Error", "Failed to rename collection");
-        if (__DEV__) {
-          console.error(
-            "[LibraryScreen.handleRenameCollection]",
-            "rename failed",
-          );
-        }
+        console.error(
+          "[LibraryScreen.handleRenameCollection]",
+          "rename failed",
+        );
         return;
       }
 
@@ -177,9 +169,7 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
         "Error",
         error instanceof Error ? error.message : "Failed to rename collection",
       );
-      if (__DEV__) {
-        console.error("[LibraryScreen.handleRenameCollection]", error);
-      }
+      console.error("[LibraryScreen.handleRenameCollection]", error);
     }
   }, [
     editingCollection,
@@ -204,12 +194,10 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ onCollectionPress }) => {
 
               if (!success) {
                 Alert.alert("Error", "Failed to delete collection");
-                if (__DEV__) {
-                  console.error(
-                    "[LibraryScreen.handleDeleteCollection]",
-                    "delete failed",
-                  );
-                }
+                console.error(
+                  "[LibraryScreen.handleDeleteCollection]",
+                  "delete failed",
+                );
                 return;
               }
 

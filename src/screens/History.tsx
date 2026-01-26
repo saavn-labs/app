@@ -1,12 +1,7 @@
-import TrackItem from "@/components/items/TrackItem";
-import { HistoryEntry, HistorySection } from "@/services";
-import { useHistoryStore } from "@/stores/historyStore";
-import { usePlayerStore } from "@/stores/playerStore";
-import { getScreenPaddingBottom } from "@/utils/designSystem";
-import { handleAsync } from "@/utils/errorHandler";
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef } from "react";
+import { useRouter } from "expo-router";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   Alert,
   Animated,
@@ -15,21 +10,35 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
-import { Text, useTheme } from "react-native-paper";
+import { Appbar, Text, useTheme } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import TrackItem from "@/components/items/TrackItem";
+import { HistoryEntry, HistorySection } from "@/services";
+import { useHistoryStore } from "@/stores/historyStore";
+import { usePlayerStore } from "@/stores/playerStore";
+import { useSnackbarStore } from "@/stores/snackbarStore";
+import { getScreenPaddingBottom } from "@/utils/designSystem";
 
 const AnimatedSectionList = Animated.createAnimatedComponent(
   SectionList<HistoryEntry, { title: string; data: HistoryEntry[] }>,
 );
 
+const INITIAL_ITEMS_PER_SECTION = 10;
+const ITEMS_PER_PAGE = 20;
+
 export default function HistoryScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const showSnackbar = useSnackbarStore((state) => state.show);
   const bottomPadding = getScreenPaddingBottom(true, true) + insets.bottom;
+
   const { playSong, currentSong } = usePlayerStore();
   const {
-    sections,
+    sections: fullSections,
     loading,
     loadHistory,
     removeHistoryEntry,
@@ -37,59 +46,101 @@ export default function HistoryScreen() {
   } = useHistoryStore();
 
   const scrollY = useRef(new Animated.Value(0)).current;
+  const [displayedItemsCount, setDisplayedItemsCount] = useState(
+    INITIAL_ITEMS_PER_SECTION,
+  );
+
+  const sections = React.useMemo(() => {
+    if (!fullSections || fullSections.length === 0) return [];
+
+    let itemCount = 0;
+    const result: HistorySection[] = [];
+
+    for (const section of fullSections) {
+      const remainingSlots = displayedItemsCount - itemCount;
+
+      if (remainingSlots <= 0) break;
+
+      const itemsToShow = Math.min(section.data.length, remainingSlots);
+
+      result.push({
+        ...section,
+        data: section.data.slice(0, itemsToShow),
+      });
+
+      itemCount += itemsToShow;
+    }
+
+    return result;
+  }, [fullSections, displayedItemsCount]);
+
+  const totalFullTracks = fullSections.reduce(
+    (sum, section) => sum + section.data.length,
+    0,
+  );
+
+  const totalDisplayedTracks = sections.reduce(
+    (sum, section) => sum + section.data.length,
+    0,
+  );
+
+  const hasMoreItems = totalDisplayedTracks < totalFullTracks;
 
   useEffect(() => {
     loadHistory();
   }, []);
 
   const handlePlaySong = async (entry: HistoryEntry) => {
-    const result = await handleAsync(
-      async () => await playSong(entry.song),
-      "Failed to play song",
-    );
-
-    if (!result.success) {
-      Alert.alert("Error", result.error || "Failed to play song");
-      if (__DEV__) {
-        console.error("[HistoryScreen.handlePlaySong]", result.error);
-      }
+    try {
+      await playSong(entry.song);
+    } catch (error) {
+      showSnackbar({
+        message: "Failed to play song",
+        variant: "error",
+      });
+      console.error("[HistoryScreen] Play failed:", error);
     }
   };
 
   const handleRemoveFromHistory = async (songId: string) => {
-    const result = await handleAsync(async () => {
+    try {
       await removeHistoryEntry(songId);
-    }, "Failed to remove from history");
-
-    if (!result.success) {
-      if (__DEV__) {
-        console.error("[HistoryScreen.handleRemoveFromHistory]", result.error);
-      }
+      showSnackbar({
+        message: "Removed from history",
+        variant: "success",
+      });
+    } catch (error) {
+      showSnackbar({
+        message: "Failed to remove from history",
+        variant: "error",
+      });
+      console.error("[HistoryScreen] Remove failed:", error);
     }
   };
 
   const handleClearHistory = () => {
     Alert.alert(
       "Clear History",
-      "Are you sure you want to clear all your listening history? This can't be undone.",
+      `Remove all ${totalFullTracks} song${totalFullTracks !== 1 ? "s" : ""} from your listening history? This can't be undone.`,
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Clear All",
           style: "destructive",
           onPress: async () => {
-            const result = await handleAsync(async () => {
+            try {
               await clearHistoryStore();
-            }, "Failed to clear history");
-
-            if (!result.success) {
-              Alert.alert("Error", result.error || "Failed to clear history");
-              if (__DEV__) {
-                console.error(
-                  "[HistoryScreen.handleClearHistory]",
-                  result.error,
-                );
-              }
+              setDisplayedItemsCount(INITIAL_ITEMS_PER_SECTION);
+              showSnackbar({
+                message: "History cleared",
+                variant: "success",
+              });
+            } catch (error) {
+              showSnackbar({
+                message: "Failed to clear history",
+                variant: "error",
+              });
+              console.error("[HistoryScreen] Clear failed:", error);
             }
           },
         },
@@ -97,64 +148,85 @@ export default function HistoryScreen() {
     );
   };
 
-  const renderHistoryItem = ({
-    item,
-  }: {
-    item: HistoryEntry;
-    index: number;
-  }) => {
-    const playedDate = new Date(item.playedAt);
-    const timeString = playedDate.toLocaleString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
+  const loadMoreItems = useCallback(() => {
+    if (!hasMoreItems || loading) return;
+
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        setDisplayedItemsCount((prev) => prev + ITEMS_PER_PAGE);
+      }, 100);
     });
+  }, [hasMoreItems, loading]);
 
-    return (
-      <View style={styles.historyItemContainer}>
-        <View style={styles.trackItemWrapper}>
-          <TrackItem
-            track={item.song}
-            onPress={() => handlePlaySong(item)}
-            isActive={currentSong?.id === item.song.id}
-          />
-        </View>
-        <View style={styles.historyItemActions}>
-          <Text
-            variant="bodySmall"
-            style={[
-              styles.playedTime,
-              { color: theme.colors.onSurfaceVariant },
-            ]}
-          >
-            {timeString}
-          </Text>
-          <TouchableOpacity
-            style={styles.removeButton}
-            onPress={() => handleRemoveFromHistory(item.song.id)}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons
-              name="close"
-              size={20}
-              color={theme.colors.onSurfaceVariant}
+  const handleEndReached = useCallback(() => {
+    loadMoreItems();
+  }, [loadMoreItems]);
+
+  const handleRefresh = useCallback(() => {
+    setDisplayedItemsCount(INITIAL_ITEMS_PER_SECTION);
+    loadHistory();
+  }, [loadHistory]);
+
+  const renderHistoryItem = useCallback(
+    ({ item }: { item: HistoryEntry; index: number }) => {
+      const playedDate = new Date(item.playedAt);
+      const timeString = playedDate.toLocaleString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+
+      return (
+        <View style={styles.historyItemContainer}>
+          <View style={styles.trackItemWrapper}>
+            <TrackItem
+              track={item.song}
+              onPress={() => handlePlaySong(item)}
+              isActive={currentSong?.id === item.song.id}
             />
-          </TouchableOpacity>
+          </View>
+          <View style={styles.historyItemActions}>
+            <Text
+              variant="bodySmall"
+              style={[
+                styles.playedTime,
+                { color: theme.colors.onSurfaceVariant },
+              ]}
+            >
+              {timeString}
+            </Text>
+            <TouchableOpacity
+              style={styles.removeButton}
+              onPress={() => handleRemoveFromHistory(item.song.id)}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons
+                name="close"
+                size={20}
+                color={theme.colors.onSurfaceVariant}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    );
-  };
+      );
+    },
+    [
+      currentSong?.id,
+      theme.colors.onSurfaceVariant,
+      handlePlaySong,
+      handleRemoveFromHistory,
+    ],
+  );
 
-  const renderSectionHeader = ({ section }: { section: HistorySection }) => {
-    if (section.title === "Today") return null;
-    return (
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: HistorySection }) => (
       <View
         style={[
           styles.sectionHeader,
           { backgroundColor: theme.colors.background },
         ]}
       >
-        <Text variant="titleLarge" style={styles.sectionTitle}>
+        <Text variant="titleMedium" style={styles.sectionTitle}>
           {section.title}
         </Text>
         <Text
@@ -167,18 +239,14 @@ export default function HistoryScreen() {
           {section.data.length} song{section.data.length !== 1 ? "s" : ""}
         </Text>
       </View>
-    );
-  };
-
-  const totalTracks = sections.reduce(
-    (sum, section) => sum + section.data.length,
-    0,
+    ),
+    [theme.colors.background, theme.colors.onSurfaceVariant],
   );
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <LinearGradient
-        colors={["#6366f1", "#8b5cf6"]}
+        colors={[theme.colors.primary, theme.colors.secondary]}
         style={styles.emptyIconContainer}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -186,62 +254,50 @@ export default function HistoryScreen() {
         <MaterialIcons name="history" size={64} color="#ffffff" />
       </LinearGradient>
       <Text variant="headlineSmall" style={styles.emptyTitle}>
-        No listening history yet
+        No listening history
       </Text>
       <Text
         variant="bodyMedium"
         style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}
       >
-        Songs you play will show up here
+        Songs you play will appear here
       </Text>
     </View>
+  );
+
+  const keyExtractor = useCallback(
+    (item: HistoryEntry) => `${item.song.id}-${item.playedAt}`,
+    [],
   );
 
   return (
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
-      {/* Main Header */}
-      <View style={[styles.header]}>
-        <View style={styles.headerContent}>
-          <Text variant="displaySmall" style={styles.headerTitle}>
-            History
-          </Text>
-          {totalTracks > 0 && (
-            <Text
-              variant="bodyLarge"
-              style={[
-                styles.headerSubtitle,
-                { color: theme.colors.onSurfaceVariant },
-              ]}
-            >
-              {totalTracks} song{totalTracks !== 1 ? "s" : ""} played
-            </Text>
-          )}
-        </View>
-        {totalTracks > 0 && (
-          <TouchableOpacity
+      <Appbar.Header elevated statusBarHeight={0}>
+        <Appbar.BackAction onPress={() => router.back()} />
+        <Appbar.Content title="History" />
+        {totalFullTracks > 0 && (
+          <Appbar.Action
+            icon="delete-outline"
             onPress={handleClearHistory}
-            style={styles.headerActionButton}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="delete-outline" size={28} color="#ef4444" />
-          </TouchableOpacity>
+            iconColor={theme.colors.error}
+          />
         )}
-      </View>
+      </Appbar.Header>
 
-      {totalTracks === 0 ? (
+      {totalFullTracks === 0 ? (
         renderEmptyState()
       ) : (
         <AnimatedSectionList
           sections={sections}
           renderItem={renderHistoryItem}
           renderSectionHeader={renderSectionHeader}
-          keyExtractor={(item) => `${item.song.id}-${item.playedAt}`}
+          keyExtractor={keyExtractor}
           refreshControl={
             <RefreshControl
               refreshing={loading}
-              onRefresh={loadHistory}
+              onRefresh={handleRefresh}
               tintColor={theme.colors.primary}
               colors={[theme.colors.primary]}
             />
@@ -250,13 +306,20 @@ export default function HistoryScreen() {
             styles.listContent,
             { paddingBottom: bottomPadding },
           ]}
-          stickySectionHeadersEnabled={false}
+          stickySectionHeadersEnabled={true}
           showsVerticalScrollIndicator={false}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { y: scrollY } } }],
             { useNativeDriver: true },
           )}
           scrollEventThrottle={16}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.5}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          initialNumToRender={10}
+          windowSize={10}
           style={styles.listContainer}
         />
       )}
@@ -267,65 +330,21 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212",
   },
-  fixedHeader: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 100,
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  fixedHeaderContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  initialLoadingContainer: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
   },
-  fixedHeaderTitle: {
-    fontWeight: "800",
-  },
-
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  headerContent: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontWeight: "900",
-    marginBottom: 8,
-    fontSize: 36,
-  },
-  headerSubtitle: {
-    fontWeight: "500",
-    opacity: 0.8,
-  },
-  headerActionButton: {
-    marginTop: 8,
-  },
-
-  clearButton: {
-    padding: 4,
-  },
-
   listContainer: {
     flex: 1,
   },
   listContent: {
     paddingBottom: 0,
   },
-
   sectionHeader: {
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -333,41 +352,43 @@ const styles = StyleSheet.create({
     borderBottomColor: "rgba(255, 255, 255, 0.05)",
   },
   sectionTitle: {
-    fontWeight: "700",
-    fontSize: 18,
+    fontWeight: "600",
   },
   sectionCount: {
     fontSize: 13,
     fontWeight: "500",
-    opacity: 0.7,
   },
-
   historyItemContainer: {
     position: "relative",
     paddingVertical: 4,
+    gap: 4,
   },
   trackItemWrapper: {
     paddingRight: 80,
   },
   historyItemActions: {
     position: "absolute",
-    right: 10,
+    right: 8,
     top: 0,
     bottom: 0,
     flexDirection: "row",
     alignItems: "center",
-    marginLeft: 8,
-    gap: 4,
+    gap: 8,
   },
   playedTime: {
     fontSize: 12,
     fontWeight: "500",
-    opacity: 0.7,
   },
   removeButton: {
     padding: 4,
   },
-
+  footerContainer: {
+    paddingVertical: 20,
+    alignItems: "center",
+  },
+  footerLoader: {
+    marginVertical: 8,
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
@@ -382,10 +403,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 24,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 12,
+    shadowRadius: 12,
+    elevation: 8,
   },
   emptyTitle: {
     fontWeight: "700",

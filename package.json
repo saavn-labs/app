@@ -12,14 +12,16 @@
     "@expo/vector-icons": "^15.0.3",
     "@react-native-community/slider": "^5.1.2",
     "@saavn-labs/sdk": "^0.1.4",
-    "expo": "~54.0.31",
+    "expo": "~54.0.32",
     "expo-dev-client": "~6.0.20",
+    "expo-file-system": "~19.0.21",
     "expo-image": "~3.0.11",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.11",
     "expo-media-library": "~18.2.1",
     "expo-navigation-bar": "~5.0.10",
-    "expo-router": "~6.0.21",
+    "expo-network": "~8.0.8",
+    "expo-router": "~6.0.22",
     "expo-speech-recognition": "^3.0.1",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
@@ -30,17 +32,17 @@
     "react-native-image-colors": "^2.5.1",
     "react-native-mmkv": "^4.1.1",
     "react-native-paper": "^5.14.5",
-    "react-native-reanimated": "~4.1.1",
-    "react-native-safe-area-context": "~5.6.0",
+    "react-native-reanimated": "~4.1.6",
+    "react-native-safe-area-context": "~5.6.2",
     "react-native-screens": "~4.16.0",
-    "react-native-track-player": "^5.0.0-alpha0-nightly-359af5a12d712d3b685530aed9b9625865a25d74",
-    "zustand": "^4.4.0"
+    "react-native-track-player": "^5.0.0-alpha0-nightly-cad7f4b0cdea1ab20fd988debcfdbdced7907a39",
+    "zustand": "^4.5.7"
   },
   "devDependencies": {
-    "@types/react": "~19.1.0",
-    "eslint": "^9.25.0",
+    "@types/react": "~19.1.17",
+    "eslint": "^9.39.2",
     "eslint-config-expo": "~10.0.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.3"
   },
   "private": true
 }

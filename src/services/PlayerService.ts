@@ -1,3 +1,4 @@
+import { downloadService } from "@/services/DownloadService";
 import { appStorage } from "@/stores/storage";
 import { PlayerStatus, RepeatMode } from "@/types";
 import { Models, Song } from "@saavn-labs/sdk";
@@ -9,16 +10,6 @@ import TrackPlayer, {
 } from "react-native-track-player";
 import { AUDIO_QUALITY, STORAGE_KEYS } from "../constants";
 import { queueService } from "./QueueService";
-
-/**
- * PlayerService - RNTP as Single Source of Truth
- *
- * PRINCIPLES:
- * 1. RNTP owns the queue and playback state
- * 2. JS prepares tracks and listens to RNTP events
- * 3. Track by song.id for sync (RNTP track.id === song.id)
- * 4. No duplicate queue management - RNTP is the authority
- */
 
 export interface PlayerState {
   status: PlayerStatus;
@@ -34,6 +25,8 @@ type StateUpdater = (updates: Partial<PlayerState>) => void;
 export class PlayerService {
   private stateUpdater: StateUpdater | null = null;
   private isInitialized = false;
+  private lastStatus: PlayerStatus | null = null;
+  private wantsToPlay = false;
 
   constructor() {
     this.initialize();
@@ -42,7 +35,6 @@ export class PlayerService {
   private async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
-    console.log("[Player] Initializing...");
     this.setupEventListeners();
     this.isInitialized = true;
   }
@@ -54,7 +46,11 @@ export class PlayerService {
   private setupEventListeners(): void {
     TrackPlayer.addEventListener(Event.PlaybackState, async (event) => {
       const status = this.mapState(event.state);
-      this.notify({ status });
+
+      if (status !== this.lastStatus) {
+        this.lastStatus = status;
+        this.notify({ status });
+      }
     });
 
     TrackPlayer.addEventListener(Event.PlaybackProgressUpdated, (event) => {
@@ -76,7 +72,7 @@ export class PlayerService {
 
           this.notify({
             currentSong: song,
-            status: "playing",
+            status: "paused",
             progress: 0,
             duration: song.duration ? song.duration * 1000 : 0,
           });
@@ -97,22 +93,19 @@ export class PlayerService {
         await TrackPlayer.skip(0);
         await TrackPlayer.play();
       } else {
-        this.notify({ status: "idle" });
+        this.notify({ status: "loading" });
       }
-    });
-
-    TrackPlayer.addEventListener(Event.PlaybackError, (event) => {
-      console.error("[Player] ❌ Error:", event);
     });
   }
 
-  /**
-   * Play a song with optional queue
-   */
   async play(song: Models.Song, providedQueue?: Models.Song[]): Promise<void> {
     try {
-      console.log("[Player] Playing:", song.title);
-      this.notify({ status: "loading" });
+      this.wantsToPlay = true;
+
+      this.notify({
+        status: "loading",
+        currentSong: song,
+      });
 
       const fullQueue = await queueService.setQueue(song, providedQueue);
 
@@ -133,26 +126,18 @@ export class PlayerService {
       await TrackPlayer.play();
 
       this.notify({
-        currentSong: song,
         upcomingTracks: fullQueue.slice(1),
       });
-    } catch (e) {
-      console.error("[Player] Play failed:", e);
-      this.notify({ status: "error" });
+    } catch (error) {
+      console.error("[Player] Play failed:", error);
     }
   }
 
-  /**
-   * Resume playback
-   */
   async resume(): Promise<void> {
+    this.wantsToPlay = true;
     await TrackPlayer.play();
   }
 
-  /**
-   * Restore last played track with saved position
-   * Called on app startup to resume from where user left off
-   */
   async restoreLastPlayedTrack(
     currentSong: Models.Song | null,
     progress: number,
@@ -160,8 +145,6 @@ export class PlayerService {
     if (!currentSong) return;
 
     try {
-      console.log("[Player] Restoring last played track:", currentSong.title);
-
       const fullQueue = await queueService.setQueue(currentSong);
 
       const tracks = await Promise.all(
@@ -189,42 +172,25 @@ export class PlayerService {
         progress: progress,
         duration: currentSong.duration ? currentSong.duration * 1000 : 0,
       });
-
-      console.log(
-        "[Player] ✅ Restored track at position:",
-        (progress / 1000).toFixed(2),
-        "s with queue of",
-        validTracks.length,
-        "tracks",
-      );
-    } catch (e) {
-      console.error("[Player] Restore track failed:", e);
+    } catch (error) {
+      console.error("[Player] Restore track failed:", error);
     }
   }
 
-  /**
-   * Pause playback
-   */
   async pause(): Promise<void> {
+    this.wantsToPlay = false;
     await TrackPlayer.pause();
   }
 
-  /**
-   * Toggle play/pause
-   */
   async togglePlayPause(): Promise<void> {
-    const state = await TrackPlayer.getPlaybackState();
-
-    if (state.state === State.Playing) {
-      await this.pause();
-    } else {
+    this.wantsToPlay = !this.wantsToPlay;
+    if (this.wantsToPlay) {
       await this.resume();
+    } else {
+      await this.pause();
     }
   }
 
-  /**
-   * Skip to next track
-   */
   async next(): Promise<void> {
     try {
       const queue = await TrackPlayer.getQueue();
@@ -252,14 +218,11 @@ export class PlayerService {
       }
 
       await TrackPlayer.skipToNext();
-    } catch (e) {
-      console.error("[Player] Next failed:", e);
+    } catch (error) {
+      console.error("[Player] Next failed:", error);
     }
   }
 
-  /**
-   * Skip to previous track (or restart if >3s)
-   */
   async previous(): Promise<void> {
     try {
       const position = await TrackPlayer.getProgress();
@@ -269,35 +232,27 @@ export class PlayerService {
       } else {
         await TrackPlayer.skipToPrevious();
       }
-    } catch (e) {
-      console.error("[Player] Previous failed:", e);
+    } catch (error) {
+      console.error("[Player] Previous failed:", error);
     }
   }
 
-  /**
-   * Seek to position (milliseconds)
-   */
   async seekTo(positionMs: number): Promise<void> {
     await TrackPlayer.seekTo(positionMs / 1000);
   }
 
-  /**
-   * Set repeat mode
-   */
   async setRepeatMode(mode: RepeatMode): Promise<void> {
     queueService.setRepeatMode(mode);
     await TrackPlayer.setRepeatMode(this.mapRepeatMode(mode));
     this.notify({ repeatMode: mode });
   }
 
-  /**
-   * Stop and clear
-   */
   async stop(): Promise<void> {
+    this.wantsToPlay = false;
     await TrackPlayer.reset();
     queueService.clear();
     this.notify({
-      status: "idle",
+      status: "loading",
       currentSong: null,
       upcomingTracks: [],
       progress: 0,
@@ -305,9 +260,6 @@ export class PlayerService {
     });
   }
 
-  /**
-   * Add song to end of queue
-   */
   async addToQueue(song: Models.Song): Promise<void> {
     try {
       const track = await this.prepareTrack(song);
@@ -317,16 +269,11 @@ export class PlayerService {
 
       await TrackPlayer.add([track]);
       queueService.addToQueue(song);
-
-      console.log("[Player] ✅ Added to queue:", song.title);
-    } catch (e) {
-      console.error("[Player] Add to queue failed:", e);
+    } catch (error) {
+      console.error("[Player] Add to queue failed:", error);
     }
   }
 
-  /**
-   * Add song to play next (after current track)
-   */
   async addNextInQueue(song: Models.Song): Promise<void> {
     try {
       const track = await this.prepareTrack(song);
@@ -339,46 +286,50 @@ export class PlayerService {
 
       await TrackPlayer.add([track], insertIndex);
       queueService.addNextInQueue(song);
-
-      console.log("[Player] ✅ Added next in queue:", song.title);
-    } catch (e) {
-      console.error("[Player] Add next in queue failed:", e);
+    } catch (error) {
+      console.error("[Player] Add next in queue failed:", error);
     }
   }
 
-  /**
-   * Prepare a Track for RNTP
-   * CRITICAL: track.id MUST be song.id for sync to work
-   */
   private async prepareTrack(song: Models.Song): Promise<Track | null> {
     try {
-      const encrypted =
-        song.media?.encryptedUrl ||
-        (await Song.getById({ songIds: song.id })).songs[0]?.media
-          ?.encryptedUrl;
+      const downloadInfo = await downloadService.getDownloadInfo(song.id);
 
-      if (!encrypted) throw new Error("No encrypted URL");
+      let url: string;
 
-      const urls = await Song.experimental.fetchStreamUrls(
-        encrypted,
-        "edge",
-        true,
-      );
+      if (downloadInfo) {
+        url = `file://${downloadInfo.filePath}`;
+      } else {
+        const encrypted =
+          song.media?.encryptedUrl ||
+          (await Song.getById({ songIds: song.id })).songs[0]?.media
+            ?.encryptedUrl;
 
-      const quality =
-        (await appStorage.getItem(STORAGE_KEYS.CONTENT_QUALITY)) || "medium";
-      const idx =
-        AUDIO_QUALITY[quality.toUpperCase() as keyof typeof AUDIO_QUALITY] ||
-        AUDIO_QUALITY.MEDIUM;
-      const url = urls[idx].url;
+        if (!encrypted) throw new Error("No encrypted URL");
 
-      if (!url) throw new Error("No streaming URL");
+        const urls = await Song.experimental.fetchStreamUrls(
+          encrypted,
+          "edge",
+          true,
+        );
+
+        const quality =
+          (await appStorage.getItem(STORAGE_KEYS.CONTENT_QUALITY)) || "medium";
+        const idx =
+          AUDIO_QUALITY[quality.toUpperCase() as keyof typeof AUDIO_QUALITY] ||
+          AUDIO_QUALITY.MEDIUM;
+
+        const streamUrl = urls[idx].url;
+        if (!streamUrl) throw new Error("No streaming URL");
+
+        url = streamUrl;
+      }
 
       const artist =
         song.artists?.primary?.map((a) => a.name).join(", ") || "Unknown";
       const album =
         typeof song.album === "string" ? song.album : song.album?.title || "";
-      const artwork = song.images?.[2]?.url || song.images?.[0]?.url || "";
+      const artwork = song.images?.[2]?.url || song.images?.[1]?.url || "";
 
       return {
         id: song.id,
@@ -389,15 +340,12 @@ export class PlayerService {
         artwork: artwork || undefined,
         duration: song.duration || undefined,
       };
-    } catch (e) {
-      console.error("[Player] Failed to prepare track:", song.title, e);
+    } catch (error) {
+      console.error("[Player] Failed to prepare track:", song.title, error);
       return null;
     }
   }
 
-  /**
-   * Extend queue if needed (when approaching end)
-   */
   private async maybeExtendQueue(seedSongId: string): Promise<boolean> {
     try {
       const newTracks = await queueService.extendQueue(seedSongId);
@@ -412,11 +360,6 @@ export class PlayerService {
 
       if (validTracks.length > 0) {
         await TrackPlayer.add(validTracks);
-        console.log(
-          "[Player] ✅ Extended queue with",
-          validTracks.length,
-          "tracks",
-        );
 
         this.notify({
           upcomingTracks: queueService.getState().upcomingTracks,
@@ -426,33 +369,19 @@ export class PlayerService {
       }
 
       return false;
-    } catch (e) {
-      console.error("[Player] Extend queue failed:", e);
+    } catch (error) {
+      console.error("[Player] Extend queue failed:", error);
       return false;
     }
   }
 
-  /**
-   * Map state
-   */
   private mapState(state: State): PlayerStatus {
-    switch (state) {
-      case State.Playing:
-        return "playing";
-      case State.Paused:
-      case State.Stopped:
-        return "paused";
-      case State.Buffering:
-      case State.Loading:
-        return "loading";
-      default:
-        return "idle";
-    }
+    if (!this.wantsToPlay) return "paused";
+    if (state === State.Playing) return "playing";
+
+    return "loading";
   }
 
-  /**
-   * Map repeat mode
-   */
   private mapRepeatMode(mode: RepeatMode): RNTPRepeatMode {
     switch (mode) {
       case "off":
@@ -464,9 +393,6 @@ export class PlayerService {
     }
   }
 
-  /**
-   * Notify state changes
-   */
   private notify(updates: Partial<PlayerState>): void {
     this.stateUpdater?.(updates);
   }

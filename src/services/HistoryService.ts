@@ -16,10 +16,6 @@ export interface HistorySection {
   data: HistoryEntry[];
 }
 
-/**
- * HistoryService manages playback history
- * Tracks listened songs with deduplication and grouping by date
- */
 export class HistoryService {
   async getHistory(): Promise<HistoryEntry[]> {
     const data = await appStorage.getItem(HISTORY_KEY);

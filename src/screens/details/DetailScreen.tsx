@@ -1,4 +1,4 @@
-import { CompactPlayer, FullPlayer, GenericMediaItem } from "@/components";
+import { CompactPlayer, FullPlayer } from "@/components";
 import EmptyState from "@/components/common/EmptyState";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
 import TrackItem from "@/components/items/TrackItem";
@@ -126,9 +126,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
         }
       } else {
         setError(result.error || `Failed to load ${type}`);
-        if (__DEV__) {
-          console.error(`[DetailScreen.loadData.${type}]`, result.error);
-        }
+        console.error(`[DetailScreen.loadData.${type}]`, result.error);
       }
 
       setLoading(false);
@@ -183,9 +181,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
     }, "Failed to share");
 
     if (!result.success) {
-      if (__DEV__) {
-        console.error("[DetailScreen.handleShare]", result.error);
-      }
+      console.error("[DetailScreen.handleShare]", result.error);
     }
   }, [data, type]);
 
@@ -375,61 +371,124 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
 
     return (
       <View style={styles.container}>
+        <Animated.View
+          style={[
+            styles.fixedHeader,
+            {
+              backgroundColor: theme.colors.background,
+              opacity: animatedStyles.headerBackgroundOpacity,
+            },
+          ]}
+        >
+          <View style={styles.fixedHeaderContent}>
+            <IconButton
+              icon="arrow-left"
+              size={24}
+              iconColor={theme.colors.onSurface}
+              onPress={onBack}
+              style={styles.fixedBackButton}
+            />
+
+            <Animated.Text
+              style={[
+                styles.fixedHeaderTitle,
+                {
+                  opacity: animatedStyles.miniTitleOpacity,
+                  color: theme.colors.onSurface,
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {displayName}
+            </Animated.Text>
+          </View>
+        </Animated.View>
+
         <Animated.ScrollView
           scrollEventThrottle={16}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: false },
+          )}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor="#ffffff"
-              colors={["#ffffff"]}
+              tintColor={theme.colors.primary}
+              colors={[theme.colors.primary]}
             />
           }
         >
           <LinearGradient
             colors={[
-              dominantColor,
-              `${dominantColor}dd`,
-              `${dominantColor}88`,
+              dominantColor || COLORS.PRIMARY,
+              `${dominantColor || COLORS.PRIMARY}cc`,
               theme.colors.background,
             ]}
-            style={styles.artistHeaderGradient}
+            style={styles.heroHeader}
           >
-            <View style={styles.artistHeader}>
-              <IconButton
-                icon="arrow-left"
-                size={24}
-                iconColor="#ffffff"
-                onPress={onBack}
-                style={styles.artistBackButton}
-              />
-
+            <Animated.View
+              style={[
+                styles.heroImageContainer,
+                {
+                  opacity: animatedStyles.imageOpacity,
+                  transform: [{ scale: animatedStyles.imageScale }],
+                },
+              ]}
+            >
               <Image
                 source={{ uri: imageUrl }}
-                style={styles.artistArtwork}
+                style={[
+                  styles.heroImage,
+                  { borderRadius: styles.heroImage.width / 2 },
+                ]}
                 resizeMode="cover"
               />
+            </Animated.View>
 
-              <Text variant="displayMedium" style={styles.artistTitle}>
-                {displayName}
-              </Text>
-
-              {data.subtitle && (
-                <Text variant="bodyLarge" style={styles.artistSubtitle}>
-                  {data.subtitle}
-                </Text>
-              )}
-            </View>
+            <IconButton
+              icon="arrow-left"
+              size={24}
+              iconColor="#ffffff"
+              onPress={onBack}
+              style={styles.heroBackButton}
+            />
           </LinearGradient>
 
           <View
             style={[
-              styles.contentWrapper,
+              styles.infoSection,
               { backgroundColor: theme.colors.background },
             ]}
           >
-            <View style={styles.artistActionsContainer}>
+            <Animated.View
+              style={[
+                styles.titleContainer,
+                {
+                  opacity: animatedStyles.titleOpacity,
+                  transform: [{ translateY: animatedStyles.titleTranslateY }],
+                },
+              ]}
+            >
+              <Text variant="headlineLarge" style={styles.mainTitle}>
+                {displayName}
+              </Text>
+
+              {data.subtitle && (
+                <Text
+                  variant="bodyMedium"
+                  style={[
+                    styles.mainSubtitle,
+                    { color: theme.colors.onSurfaceVariant },
+                  ]}
+                >
+                  {data.subtitle}
+                </Text>
+              )}
+            </Animated.View>
+
+            <View style={styles.actionsRow}>
               <TouchableOpacity
                 onPress={handlePlayAll}
                 style={[
@@ -440,7 +499,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
               >
                 <IconButton
                   icon="play"
-                  size={28}
+                  size={32}
                   iconColor="#000000"
                   style={styles.playIconLarge}
                 />
@@ -453,7 +512,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
               >
                 <IconButton
                   icon="share-variant-outline"
-                  size={24}
+                  size={26}
                   iconColor={theme.colors.onSurface}
                   style={styles.actionIcon}
                 />
@@ -475,8 +534,11 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
                   variant="titleMedium"
                   style={[
                     styles.tabText,
-                    selectedTab === "songs" && {
-                      color: theme.colors.onSurface,
+                    {
+                      color:
+                        selectedTab === "songs"
+                          ? theme.colors.onSurface
+                          : theme.colors.onSurfaceVariant,
                     },
                   ]}
                 >
@@ -498,8 +560,11 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
                   variant="titleMedium"
                   style={[
                     styles.tabText,
-                    selectedTab === "albums" && {
-                      color: theme.colors.onSurface,
+                    {
+                      color:
+                        selectedTab === "albums"
+                          ? theme.colors.onSurface
+                          : theme.colors.onSurfaceVariant,
                     },
                   ]}
                 >
@@ -641,7 +706,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
           >
             <Image
               source={{ uri: imageUrl }}
-              style={styles.heroImage}
+              style={[styles.heroImage, { borderRadius: 4 }]}
               resizeMode="cover"
             />
           </Animated.View>
@@ -804,9 +869,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   heroImage: {
-    width: SCREEN_WIDTH * 0.7,
-    height: SCREEN_WIDTH * 0.7,
-    borderRadius: 4,
+    width: SCREEN_WIDTH * 0.8,
+    height: SCREEN_WIDTH * 0.8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.8,
@@ -891,17 +955,6 @@ const styles = StyleSheet.create({
     left: 8,
     margin: 0,
     backgroundColor: "rgba(0,0,0,0.3)",
-  },
-  artistArtwork: {
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.6,
-    shadowRadius: 24,
-    elevation: 16,
   },
   artistTitle: {
     fontWeight: "900",

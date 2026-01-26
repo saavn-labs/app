@@ -6,6 +6,7 @@ export const STORAGE_KEYS = {
   USER_PREFERENCES: "@user_preferences",
   PLAYER_STATE: "@player_state",
   CONTENT_QUALITY: "CONTENT_QUALITY",
+  DOWNLOADS: "@downloads",
 } as const;
 
 export const PLAYER_CONFIG = {

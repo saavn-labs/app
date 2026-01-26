@@ -13,7 +13,7 @@ export async function handleAsync<T>(
     return { success: true, data };
   } catch (error) {
     const message = error instanceof Error ? error.message : errorMessage;
-    if (__DEV__) console.error(`[Error] ${errorMessage}:`, error);
+    console.error(`[Error] ${errorMessage}:`, error);
     return { success: false, error: message };
   }
 }

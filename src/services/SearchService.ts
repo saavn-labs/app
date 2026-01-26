@@ -16,10 +16,6 @@ const EMPTY_RESULTS: SearchResults = {
   playlists: [],
 };
 
-/**
- * SearchService handles all search operations
- * Supports category-specific and all-categories search with abort signals
- */
 export class SearchService {
   constructor(private readonly defaultLimit = 50) {}
 

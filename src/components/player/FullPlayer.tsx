@@ -30,6 +30,7 @@ import {
 } from "react-native";
 import { Text } from "react-native-paper";
 import TrackItem from "../items/TrackItem";
+import LoadingHeartbeat from "./LoadingHeartBeat";
 
 const { width } = Dimensions.get("window");
 
@@ -305,11 +306,15 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
                 activeOpacity={0.8}
                 disabled={status === "loading"}
               >
-                <MaterialIcons
-                  name={status === "playing" ? "pause" : "play-arrow"}
-                  size={48}
-                  color="#000000"
-                />
+                {status === "loading" ? (
+                  <LoadingHeartbeat color="#000000" size={48} />
+                ) : (
+                  <MaterialIcons
+                    name={status === "playing" ? "pause" : "play-arrow"}
+                    size={48}
+                    color="#000000"
+                  />
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity

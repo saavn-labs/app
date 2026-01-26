@@ -1,9 +1,8 @@
 import FullPlayer from "@/components/player/FullPlayer";
 import { StyleSheet, View } from "react-native";
-import { useRouter } from "expo-router";
+import { router } from "expo-router";
 
 export default function NotificationTab() {
-  const router = useRouter();
   const playerVisible = true;
 
   const handleClose = () => {

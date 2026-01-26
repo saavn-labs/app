@@ -1,4 +1,3 @@
-import { Platform } from "react-native";
 import { imageColorCache } from "./cache";
 
 type ColorUpdateCallback = (color: string) => void;
@@ -11,7 +10,7 @@ try {
   const imageColorsModule = require("react-native-image-colors");
   getColorsFunction = imageColorsModule.getColors;
 } catch {
-  if (__DEV__) console.warn("react-native-image-colors not available");
+  console.warn("react-native-image-colors not available");
 }
 
 export const extractDominantColor = async (
@@ -35,7 +34,7 @@ export const extractDominantColor = async (
 
       color = result.darkVibrant || fallbackColor;
     } catch (error) {
-      if (__DEV__) console.warn("Color extraction failed:", error);
+      console.warn("Color extraction failed:", error);
     }
   }
 

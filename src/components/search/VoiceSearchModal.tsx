@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Animated,
-  Modal,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Animated,
+    Modal,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { IconButton, Text, useTheme } from "react-native-paper";
 
@@ -15,7 +15,7 @@ try {
   const speechRecognition = require("expo-speech-recognition");
   SpeechModule = speechRecognition.ExpoSpeechRecognitionModule;
   useSpeechEvent = speechRecognition.useSpeechRecognitionEvent;
-} catch (e) {
+} catch (error) {
   console.warn("expo-speech-recognition not available");
 }
 

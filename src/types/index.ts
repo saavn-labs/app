@@ -1,7 +1,7 @@
 import { Models } from "@saavn-labs/sdk";
 
 export type MediaType = "song" | "album" | "artist" | "playlist" | "collection";
-export type PlayerStatus = "idle" | "loading" | "playing" | "paused" | "error";
+export type PlayerStatus = "playing" | "paused" | "loading";
 export type RepeatMode = "off" | "one" | "all";
 export type SearchCategory = "songs" | "albums" | "artists" | "playlists";
 export type SearchTab = SearchCategory | null;
