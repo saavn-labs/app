@@ -1,6 +1,6 @@
 <div align="center">
 
-# <div style="display: flex; align-items: center; justify-content: center; gap: 10px"><img src="assets/images/icon.png" alt="Sausic Banner" width="40" style="border-radius: 5px;"/> Sausic </div>
+# <div style="display: flex; align-items: center; justify-content: center; gap: 10px"><img src="assets/images/icon.png" alt="Sausico Banner" width="40" style="border-radius: 5px;"/> Sausico </div>
 
 ### A Modern, High-Performance JioSaavn Client
 
@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?style=flat&logo=android&logoColor=white)](https://www.android.com/)
 
-<img src="assets/images/banner.jpg" alt="Sausic Banner" width="800"/>
+<img src="assets/images/banner.jpg" alt="Sausico Banner" width="800"/>
 
 **Experience music streaming reimagined with cutting-edge technology and thoughtful design.**
 
@@ -21,9 +21,9 @@
 
 ## 📖 Overview
 
-**Sausic** is a full-featured music streaming application that demonstrates modern mobile development best practices. Built with **Expo**, **React Native's New Architecture**, and powered by **@saavn-labs/sdk** and **react-native-track-player**, it delivers a premium music experience with exceptional performance and a polished user interface.
+**Sausico** is a full-featured music streaming application that demonstrates modern mobile development best practices. Built with **Expo**, **React Native's New Architecture**, and powered by **@saavn-labs/sdk** and **react-native-track-player**, it delivers a premium music experience with exceptional performance and a polished user interface.
 
-### Why Sausic?
+### Why Sausico?
 
 - 🏗️ **Production-Ready Architecture** – Built for scale and maintainability
 - ⚡ **Blazing Fast** – Optimized with MMKV storage and efficient state management
