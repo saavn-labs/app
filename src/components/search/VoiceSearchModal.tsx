@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Modal,
+  Platform,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -194,11 +195,13 @@ const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
     }
 
     try {
-      const permissions = await SpeechModule.requestPermissionsAsync();
+      if (Platform.OS !== "web") {
+        const permissions = await SpeechModule.requestPermissionsAsync();
 
-      if (!permissions.granted) {
-        setError("Microphone permission is required for voice search.");
-        return;
+        if (!permissions.granted) {
+          setError("Microphone permission is required for voice search.");
+          return;
+        }
       }
 
       SpeechModule.start({

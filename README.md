@@ -1,6 +1,6 @@
 <div align="center">
 
-# <div style="display: flex; align-items: center; justify-content: center; gap: 10px"><img src="assets/images/icon.png" alt="Saavn Music Banner" width="40" style="border-radius: 5px;"/> Saavn Music </div>
+# <div style="display: flex; align-items: center; justify-content: center; gap: 10px"><img src="assets/images/icon.png" alt="Sausic Banner" width="40" style="border-radius: 5px;"/> Sausic </div>
 
 ### A Modern, High-Performance JioSaavn Client
 
@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?style=flat&logo=android&logoColor=white)](https://www.android.com/)
 
-<img src="assets/images/banner.jpg" alt="Saavn Music Banner" width="800"/>
+<img src="assets/images/banner.jpg" alt="Sausic Banner" width="800"/>
 
 **Experience music streaming reimagined with cutting-edge technology and thoughtful design.**
 
@@ -21,9 +21,9 @@
 
 ## 📖 Overview
 
-**Saavn Music** is a full-featured music streaming application that demonstrates modern mobile development best practices. Built with **Expo**, **React Native's New Architecture**, and powered by **@saavn-labs/sdk** and **react-native-track-player**, it delivers a premium music experience with exceptional performance and a polished user interface.
+**Sausic** is a full-featured music streaming application that demonstrates modern mobile development best practices. Built with **Expo**, **React Native's New Architecture**, and powered by **@saavn-labs/sdk** and **react-native-track-player**, it delivers a premium music experience with exceptional performance and a polished user interface.
 
-### Why Saavn Music?
+### Why Sausic?
 
 - 🏗️ **Production-Ready Architecture** – Built for scale and maintainability
 - ⚡ **Blazing Fast** – Optimized with MMKV storage and efficient state management
@@ -259,8 +259,8 @@ Before you begin, ensure you have the following installed:
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/saavn-labs/saavn-music.git
-cd saavn-music
+git clone https://github.com/saavn-labs/app.git
+cd app
 ```
 
 2. **Install dependencies**
@@ -379,7 +379,7 @@ This project is intended for **educational and personal use only**. Please respe
 
 ## License
 
-**MIT** © 2025 Saavn Labs
+**MIT** © 2026 Saavn Labs
 
 See [LICENSE](./LICENSE) for details.
 

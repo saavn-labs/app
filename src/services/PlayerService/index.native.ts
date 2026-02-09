@@ -1,3 +1,4 @@
+import { AUDIO_QUALITY, STORAGE_KEYS } from "@/constants";
 import { downloadService } from "@/services/DownloadService";
 import { appStorage } from "@/stores/storage";
 import { PlayerStatus, RepeatMode } from "@/types";
@@ -8,21 +9,10 @@ import TrackPlayer, {
   State,
   Track,
 } from "react-native-track-player";
-import { AUDIO_QUALITY, STORAGE_KEYS } from "../constants";
-import { queueService } from "./QueueService";
+import { queueService } from "../QueueService";
+import { IPlayerService, PlayerState, StateUpdater } from "./index.types";
 
-export interface PlayerState {
-  status: PlayerStatus;
-  currentSong: Models.Song | null;
-  upcomingTracks: Models.Song[];
-  progress: number;
-  duration: number;
-  repeatMode: RepeatMode;
-}
-
-type StateUpdater = (updates: Partial<PlayerState>) => void;
-
-export class PlayerService {
+export class PlayerService implements IPlayerService {
   private stateUpdater: StateUpdater | null = null;
   private isInitialized = false;
   private lastStatus: PlayerStatus | null = null;
@@ -399,3 +389,4 @@ export class PlayerService {
 }
 
 export const playerService = new PlayerService();
+export type { PlayerState } from "./index.types";

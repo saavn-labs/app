@@ -1,13 +1,13 @@
 import {
   CompactPlayer,
-  FullPlayer,
   EmptyState,
+  FullPlayer,
   LoadingSpinner,
   TrackItem,
 } from "@/components";
 import { COLORS } from "@/constants";
-import { usePlayerStore, useDetailStore } from "@/stores";
-import { handleAsync, theme, getScreenPaddingBottom } from "@/utils";
+import { useDetailStore, usePlayerStore } from "@/stores";
+import { getScreenPaddingBottom, handleAsync, theme } from "@/utils";
 import { Album, Artist, Models, Playlist } from "@saavn-labs/sdk";
 
 import { LinearGradient } from "expo-linear-gradient";
@@ -168,7 +168,7 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
     const result = await handleAsync(async () => {
       const displayName = data.title || data.name || "Unknown";
       const shareUrl =
-        data.url || `https://www.jiosaavn.com/${type}/${data.id}`;
+        data.url?.replace("www.jiosaavn.com", "www.sausic.pages.dev") || `https://www.sausic.pages.dev/${type}/${data.id}`;
       const message =
         type === "artist"
           ? `Check out ${displayName} on JioSaavn\n${shareUrl}`

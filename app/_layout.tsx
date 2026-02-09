@@ -1,7 +1,9 @@
 import GlobalSnackbar from "@/components/common/GlobalSnackbar";
+import { iconFonts } from "@/utils/loadFonts";
+import { playerService } from "@/services/PlayerService/index.web";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { Link, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { setStatusBarBackgroundColor, StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -47,6 +49,7 @@ const theme = {
 export default function Layout() {
   const [fontsLoaded, fontError] = useFonts({
     SpotifyMedium: require("../assets/fonts/SpotifyMedium.ttf"),
+    ...iconFonts,
   });
 
   const { restoreLastTrack } = usePlayerStore();
@@ -72,6 +75,10 @@ export default function Layout() {
   }, [fontsLoaded]);
 
   useEffect(() => {
+    playerService.initialize();
+  }, []);
+
+  useEffect(() => {
     setStatusBarBackgroundColor("#121212", false);
   }, []);
 
@@ -93,6 +100,10 @@ export default function Layout() {
         style={styles.root}
         edges={["top", "bottom", "left", "right"]}
       >
+        <Link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/@mdi/font/css/materialdesignicons.min.css"
+        />
         <Stack
           screenOptions={{
             headerShown: false,
