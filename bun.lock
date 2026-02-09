@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "sausic",
+      "name": "sausico",
       "dependencies": {
         "@expo/metro-runtime": "~6.1.2",
         "@expo/vector-icons": "^15.0.3",

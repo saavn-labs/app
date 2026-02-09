@@ -1,9 +1,9 @@
 import {
-  CompactPlayer,
-  EmptyState,
-  FullPlayer,
-  LoadingSpinner,
-  TrackItem,
+    CompactPlayer,
+    EmptyState,
+    FullPlayer,
+    LoadingSpinner,
+    TrackItem,
 } from "@/components";
 import { COLORS } from "@/constants";
 import { useDetailStore, usePlayerStore } from "@/stores";
@@ -12,22 +12,22 @@ import { Album, Artist, Models, Playlist } from "@saavn-labs/sdk";
 
 import { LinearGradient } from "expo-linear-gradient";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  Animated,
-  Dimensions,
-  FlatList,
-  Image,
-  RefreshControl,
-  Share,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Animated,
+    Dimensions,
+    FlatList,
+    Image,
+    RefreshControl,
+    Share,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { IconButton, Text } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -168,7 +168,8 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
     const result = await handleAsync(async () => {
       const displayName = data.title || data.name || "Unknown";
       const shareUrl =
-        data.url?.replace("www.jiosaavn.com", "www.sausic.pages.dev") || `https://www.sausic.pages.dev/${type}/${data.id}`;
+        data.url?.replace("www.jiosaavn.com", "www.sausico.pages.dev") ||
+        `https://www.sausico.pages.dev/${type}/${data.id}`;
       const message =
         type === "artist"
           ? `Check out ${displayName} on JioSaavn\n${shareUrl}`

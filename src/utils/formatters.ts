@@ -56,7 +56,10 @@ export function formatShareMessage(song: Models.Song): {
   title: string;
 } {
   const url =
-    (song as Models.Song).url.replace("www.jiosaavn.com", "www.sausic.pages.dev") || `https://www.sausic.pages.dev/song/${song.id}`;
+    (song as Models.Song).url.replace(
+      "www.jiosaavn.com",
+      "www.sausico.pages.dev",
+    ) || `https://www.sausico.pages.dev/song/${song.id}`;
   const artistsText = formatArtistNames(song);
   const message = `Check out "${song.title}" by ${artistsText} on JioSaavn`;
 
