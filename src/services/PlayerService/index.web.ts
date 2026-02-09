@@ -24,7 +24,7 @@ export class PlayerService implements IPlayerService {
     if (this.isInitialized) return;
 
     if (typeof window === "undefined") {
-      return; // build / SSR: bail out
+      return;
     }
 
     this.audio = new Audio();

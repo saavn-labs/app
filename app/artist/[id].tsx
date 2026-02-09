@@ -7,7 +7,6 @@ export default function ArtistDetail() {
   return (
     <ArtistScreen
       artistId={id}
-      onBack={() => router.back()}
       onAlbumPress={(albumId) => router.push(`/album/${albumId}`)}
     />
   );

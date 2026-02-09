@@ -10,6 +10,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   Alert,
   Animated,
+  Platform,
   RefreshControl,
   SectionList,
   StyleSheet,
@@ -113,35 +114,42 @@ export default function HistoryScreen() {
       console.error("[HistoryScreen] Remove failed:", error);
     }
   };
+  const clearHistory = async () => {
+    try {
+      await clearHistoryStore();
+      setDisplayedItemsCount(INITIAL_ITEMS_PER_SECTION);
+      showSnackbar({
+        message: "History cleared",
+        variant: "success",
+      });
+    } catch (error) {
+      showSnackbar({
+        message: "Failed to clear history",
+        variant: "error",
+      });
+      console.error("[HistoryScreen] Clear failed:", error);
+    }
+  };
 
   const handleClearHistory = () => {
-    Alert.alert(
-      "Clear History",
-      `Remove all ${totalFullTracks} song${totalFullTracks !== 1 ? "s" : ""} from your listening history? This can't be undone.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Clear All",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await clearHistoryStore();
-              setDisplayedItemsCount(INITIAL_ITEMS_PER_SECTION);
-              showSnackbar({
-                message: "History cleared",
-                variant: "success",
-              });
-            } catch (error) {
-              showSnackbar({
-                message: "Failed to clear history",
-                variant: "error",
-              });
-              console.error("[HistoryScreen] Clear failed:", error);
-            }
+    if (Platform.OS !== "web") {
+      Alert.alert(
+        "Clear History",
+        `Remove all ${totalFullTracks} song${totalFullTracks !== 1 ? "s" : ""} from your listening history? This can't be undone.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Clear All",
+            style: "destructive",
+            onPress: clearHistory,
           },
-        },
-      ],
-    );
+        ],
+      );
+    } else {
+      window.confirm(
+        `Remove all ${totalFullTracks} song${totalFullTracks !== 1 ? "s" : ""} from your listening history? This can't be undone.`,
+      ) && clearHistory();
+    }
   };
 
   const loadMoreItems = useCallback(() => {
@@ -271,7 +279,7 @@ export default function HistoryScreen() {
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
       <Appbar.Header elevated statusBarHeight={0}>
-        <Appbar.BackAction onPress={() => router.back()} />
+        <Appbar.BackAction onPress={() => router.push("/")} />
         <Appbar.Content title="History" />
         {totalFullTracks > 0 && (
           <Appbar.Action

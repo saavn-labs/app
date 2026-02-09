@@ -1,7 +1,7 @@
 import GlobalSnackbar from "@/components/common/GlobalSnackbar";
-import { iconFonts } from "@/utils/loadFonts";
 import { playerService } from "@/services/PlayerService/index.web";
 import { usePlayerStore } from "@/stores/playerStore";
+import { iconFonts } from "@/utils/loadFonts";
 import { useFonts } from "expo-font";
 import { Link, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -115,6 +115,15 @@ export default function Layout() {
             options={{
               headerShown: false,
               contentStyle: styles.screenStyle,
+            }}
+          />
+          <Stack.Screen
+            name="song/[id]"
+            options={{
+              headerShown: false,
+              contentStyle: styles.screenStyle,
+              gestureEnabled: false,
+              animationDuration: 0,
             }}
           />
           <Stack.Screen

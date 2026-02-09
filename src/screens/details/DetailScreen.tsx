@@ -1,9 +1,9 @@
 import {
-    CompactPlayer,
-    EmptyState,
-    FullPlayer,
-    LoadingSpinner,
-    TrackItem,
+  CompactPlayer,
+  EmptyState,
+  FullPlayer,
+  LoadingSpinner,
+  TrackItem,
 } from "@/components";
 import { COLORS } from "@/constants";
 import { useDetailStore, usePlayerStore } from "@/stores";
@@ -11,23 +11,24 @@ import { getScreenPaddingBottom, handleAsync, theme } from "@/utils";
 import { Album, Artist, Models, Playlist } from "@saavn-labs/sdk";
 
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    Animated,
-    Dimensions,
-    FlatList,
-    Image,
-    RefreshControl,
-    Share,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  FlatList,
+  Image,
+  RefreshControl,
+  Share,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { IconButton, Text } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -43,7 +44,6 @@ type DetailType = "album" | "playlist" | "artist";
 interface DetailScreenProps {
   type: DetailType;
   id: string;
-  onBack: () => void;
   onAlbumPress?: (albumId: string) => void;
 }
 
@@ -63,7 +63,6 @@ interface DetailData {
 const DetailScreen: React.FC<DetailScreenProps> = ({
   type,
   id,
-  onBack,
   onAlbumPress,
 }) => {
   const insets = useSafeAreaInsets();
@@ -88,6 +87,10 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
   useEffect(() => {
     loadData();
   }, [id, type]);
+
+  const onBack = () => {
+    router.push("/");
+  };
 
   const loadData = useCallback(
     async (isRefreshing = false) => {
@@ -167,17 +170,11 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
 
     const result = await handleAsync(async () => {
       const displayName = data.title || data.name || "Unknown";
-      const shareUrl =
-        data.url?.replace("www.jiosaavn.com", "www.sausico.pages.dev") ||
-        `https://www.sausico.pages.dev/${type}/${data.id}`;
-      const message =
-        type === "artist"
-          ? `Check out ${displayName} on JioSaavn\n${shareUrl}`
-          : `Check out "${displayName}" on JioSaavn\n${shareUrl}`;
+      const shareUrl = `https://sausico.pages.dev/${type}/${data.id}`;
+      const message = `Check out ${displayName} on Sausico\n${shareUrl}`;
 
       await Share.share({
         message,
-        url: shareUrl,
         title: displayName,
       });
     }, "Failed to share");

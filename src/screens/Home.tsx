@@ -1,10 +1,11 @@
 import { GenericMediaItem, TrackItem } from "@/components";
 import { AUDIO_QUALITY, COLORS, UI_CONFIG } from "@/constants";
-import { usePlayerStore, useHomeStore } from "@/stores";
+import { useHomeStore, usePlayerStore } from "@/stores";
 import { getScreenPaddingBottom } from "@/utils";
 import { Models } from "@saavn-labs/sdk";
 
 import { LinearGradient } from "expo-linear-gradient";
+import * as Network from "expo-network";
 import { router } from "expo-router";
 import React, {
   useCallback,
@@ -25,21 +26,21 @@ import {
   View,
 } from "react-native";
 import {
+  Button,
   Chip,
   IconButton,
   Modal,
   Portal,
   RadioButton,
   Text,
-  Button,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as Network from "expo-network";
 
 interface HomeScreenProps {
   onAlbumPress: (albumId: string) => void;
   onPlaylistPress: (playlistId: string) => void;
   onSearchFocus: () => void;
+  deferInitialLoad?: boolean;
 }
 
 interface Section {
@@ -219,6 +220,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   onAlbumPress,
   onPlaylistPress,
   onSearchFocus,
+  deferInitialLoad = false,
 }) => {
   const { playSong, currentSong } = usePlayerStore();
   const insets = useSafeAreaInsets();
@@ -265,14 +267,24 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [loadPreferences]);
 
   const lastLoadedLanguage = useRef<string | null>(null);
+  const hasDeferred = useRef(false);
 
   useEffect(() => {
     if (!selectedLanguage) return;
     if (lastLoadedLanguage.current === selectedLanguage) return;
 
+    if (deferInitialLoad && !hasDeferred.current) {
+      hasDeferred.current = true;
+      const timer = setTimeout(() => {
+        lastLoadedLanguage.current = selectedLanguage;
+        loadHomeData(selectedLanguage);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+
     lastLoadedLanguage.current = selectedLanguage;
     loadHomeData(selectedLanguage);
-  }, [loadHomeData, selectedLanguage]);
+  }, [loadHomeData, selectedLanguage, deferInitialLoad]);
 
   const handleTrackPress = useCallback(
     (track: Models.Song, allTracks: Models.Song[]) => {

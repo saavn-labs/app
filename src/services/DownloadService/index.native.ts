@@ -2,6 +2,7 @@ import { AUDIO_QUALITY, STORAGE_KEYS } from "@/constants";
 import { appStorage } from "@/stores/storage";
 import { Models, Song } from "@saavn-labs/sdk";
 import { Directory, File, Paths } from "expo-file-system";
+import * as MediaLibrary from "expo-media-library";
 
 export interface DownloadedTrack {
   id: string;
@@ -278,6 +279,63 @@ export class DownloadService {
       averageSize: downloads.length > 0 ? totalSize / downloads.length : 0,
       byQuality,
     };
+  }
+
+  async saveToDownloads(fileUri: string): Promise<void> {
+    const { status } = await MediaLibrary.getPermissionsAsync();
+
+    if (status !== "granted") {
+      const { status: newStatus } =
+        await MediaLibrary.requestPermissionsAsync();
+
+      if (newStatus !== "granted") {
+        throw new Error("Permission to access media library is required");
+      }
+    }
+
+    let album = await MediaLibrary.getAlbumAsync("Sausico Exports");
+
+    if (!album) {
+      const asset = await MediaLibrary.createAssetAsync(fileUri);
+      await MediaLibrary.createAlbumAsync("Sausico Exports", asset, false);
+    } else {
+      await MediaLibrary.createAssetAsync(fileUri, album);
+    }
+  }
+
+  async exportTracks(songIds: string[]): Promise<void> {
+    const downloads = await this.getDownloadedTracks();
+
+    for (const songId of songIds) {
+      const download = downloads.find((d) => d.id === songId);
+      if (!download) continue;
+
+      try {
+        const sourceFile = new File(download.filePath);
+        if (!sourceFile.exists) {
+          console.warn(
+            `[DownloadService] Source file not found: ${download.filePath}`,
+          );
+          continue;
+        }
+
+        const artist =
+          download.song.artists?.primary?.[0]?.name || "Unknown Artist";
+        const title = download.song.title || "Unknown";
+        const extension = download.filePath.split(".").pop() || "mp3";
+
+        const safeArtist = artist.replace(/[^a-z0-9._-]/gi, "_").slice(0, 50);
+        const safeTitle = title.replace(/[^a-z0-9._-]/gi, "_").slice(0, 50);
+        const filename = `${safeArtist} - ${safeTitle}.${extension}`;
+
+        const fileUri = download.filePath;
+
+        await this.saveToDownloads(fileUri);
+      } catch (error) {
+        console.error(`[DownloadService] Failed to export ${songId}:`, error);
+        throw error;
+      }
+    }
   }
 }
 

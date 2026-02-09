@@ -4,14 +4,18 @@ import { useDownloadsStore, useSnackbarStore } from "@/stores";
 import { usePlayerActions } from "@/stores/playerStore";
 import { theme } from "@/utils";
 
+import { MaterialIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Animated,
   FlatList,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from "react-native";
 import {
@@ -24,8 +28,6 @@ import {
   Text,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
-import { MaterialIcons } from "@expo/vector-icons";
 
 const Downloads: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -37,8 +39,8 @@ const Downloads: React.FC = () => {
     error,
     loadDownloads,
     deleteDownload,
-    deleteAllDownloads,
     cleanupOrphans,
+    exportTracks,
   } = useDownloadsStore();
 
   const { playSong } = usePlayerActions();
@@ -47,6 +49,9 @@ const Downloads: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [fadeAnim] = useState(new Animated.Value(0));
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [exporting, setExporting] = useState(false);
 
   const totalSize = downloads.reduce((sum, d) => sum + d.fileSize, 0);
   const activeDownloadsList = Array.from(activeDownloads.values());
@@ -94,76 +99,103 @@ const Downloads: React.FC = () => {
     [downloads, playSong],
   );
 
+  const deleteDownloadById = async (songId: string) => {
+    try {
+      setDeletingIds((prev) => new Set(prev).add(songId));
+      await deleteDownload(songId);
+      showSnackbar({
+        message: "Download deleted",
+        variant: "success",
+      });
+    } catch (error) {
+      showSnackbar({
+        message: "Failed to delete download",
+        variant: "error",
+      });
+    } finally {
+      setDeletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(songId);
+        return next;
+      });
+    }
+  };
+
   const handleDelete = useCallback(
     (songId: string) => {
       const download = downloads.find((d) => d.id === songId);
       if (!download) return;
 
-      Alert.alert(
-        "Delete Download",
-        `Remove "${download.song.title}" from downloads?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Delete",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                setDeletingIds((prev) => new Set(prev).add(songId));
-                await deleteDownload(songId);
-                showSnackbar({
-                  message: "Download deleted",
-                  variant: "success",
-                });
-              } catch (error) {
-                showSnackbar({
-                  message: "Failed to delete download",
-                  variant: "error",
-                });
-              } finally {
-                setDeletingIds((prev) => {
-                  const next = new Set(prev);
-                  next.delete(songId);
-                  return next;
-                });
-              }
+      if (Platform.OS !== "web") {
+        Alert.alert(
+          "Delete Download",
+          `Remove "${download.song.title}" from downloads?`,
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Delete",
+              style: "destructive",
+              onPress: () => deleteDownloadById(songId),
             },
-          },
-        ],
-      );
+          ],
+        );
+      } else {
+        window.confirm(`Remove "${download.song.title}" from downloads?`) &&
+          deleteDownloadById(songId);
+      }
     },
     [downloads, deleteDownload, showSnackbar],
   );
 
-  const handleDeleteAll = useCallback(() => {
-    if (downloads.length === 0) return;
+  const toggleSelectionMode = useCallback(() => {
+    setSelectionMode((prev) => !prev);
+    setSelectedIds(new Set());
+  }, []);
 
-    Alert.alert(
-      "Delete All Downloads",
-      `Remove all ${downloads.length} downloaded song${downloads.length !== 1 ? "s" : ""}? This will free up ${formatBytes(totalSize)}.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete All",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteAllDownloads();
-              showSnackbar({
-                message: "All downloads deleted",
-                variant: "success",
-              });
-            } catch (error) {
-              showSnackbar({
-                message: "Failed to delete downloads",
-                variant: "error",
-              });
-            }
-          },
-        },
-      ],
-    );
-  }, [downloads.length, deleteAllDownloads, totalSize, showSnackbar]);
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === downloads.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(downloads.map((d) => d.id)));
+    }
+  }, [selectedIds.size, downloads]);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleExport = useCallback(async () => {
+    if (selectedIds.size === 0) {
+      showSnackbar({ message: "No tracks selected", variant: "info" });
+      return;
+    }
+
+    try {
+      setExporting(true);
+      await exportTracks(Array.from(selectedIds));
+      showSnackbar({
+        message: `Exported ${selectedIds.size} track${selectedIds.size !== 1 ? "s" : ""}`,
+        variant: "success",
+      });
+      setSelectionMode(false);
+      setSelectedIds(new Set());
+    } catch (error) {
+      showSnackbar({
+        message: "Failed to export tracks",
+        variant: "error",
+      });
+    } finally {
+      setExporting(false);
+    }
+  }, [selectedIds, exportTracks, showSnackbar]);
 
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return "0 B";
@@ -266,70 +298,145 @@ const Downloads: React.FC = () => {
     if (downloads.length === 0) return null;
 
     return (
-      <Surface style={styles.statsContainer} elevation={0}>
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <MaterialIcons
-              name="library-music"
-              size={24}
-              color={theme.colors.primary}
-              style={styles.statIcon}
-            />
-            <Text variant="bodySmall" style={styles.statLabel}>
-              Songs
-            </Text>
-            <Text variant="titleLarge" style={styles.statValue}>
-              {downloads.length}
-            </Text>
-          </View>
-          <Divider style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <MaterialIcons
-              name="storage"
-              size={24}
-              color={theme.colors.primary}
-              style={styles.statIcon}
-            />
-            <Text variant="bodySmall" style={styles.statLabel}>
-              Storage
-            </Text>
-            <Text variant="titleLarge" style={styles.statValue}>
-              {formatBytes(totalSize)}
-            </Text>
-          </View>
-        </View>
-      </Surface>
+      <>
+        {selectionMode ? (
+          <Surface style={styles.selectionHeader} elevation={1}>
+            <View style={styles.selectionHeaderContent}>
+              <IconButton
+                icon="close"
+                size={24}
+                onPress={toggleSelectionMode}
+                iconColor={theme.colors.onSurface}
+              />
+              <Text variant="titleMedium" style={styles.selectionTitle}>
+                {selectedIds.size} selected
+              </Text>
+              <View style={styles.selectionActions}>
+                <IconButton
+                  icon={
+                    selectedIds.size === downloads.length
+                      ? "checkbox-marked"
+                      : "checkbox-blank-outline"
+                  }
+                  size={24}
+                  onPress={toggleSelectAll}
+                  iconColor={theme.colors.primary}
+                />
+                <IconButton
+                  icon="export"
+                  size={24}
+                  onPress={handleExport}
+                  disabled={selectedIds.size === 0 || exporting}
+                  loading={exporting}
+                  iconColor={theme.colors.primary}
+                />
+              </View>
+            </View>
+          </Surface>
+        ) : (
+          <Surface style={styles.statsContainer} elevation={0}>
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <MaterialIcons
+                  name="storage"
+                  size={24}
+                  color={theme.colors.primary}
+                  style={styles.statIcon}
+                />
+                <Text variant="bodySmall" style={styles.statLabel}>
+                  Storage
+                </Text>
+                <Text variant="titleLarge" style={styles.statValue}>
+                  {formatBytes(totalSize)}
+                </Text>
+              </View>
+              {!selectionMode && (
+                <>
+                  <Divider style={styles.statDivider} />
+                  <TouchableOpacity
+                    style={styles.statItem}
+                    onPress={toggleSelectionMode}
+                  >
+                    <MaterialIcons
+                      name="file-copy"
+                      size={24}
+                      color={theme.colors.primary}
+                    />
+                    <Text variant="bodySmall" style={styles.statLabel}>
+                      Export
+                    </Text>
+                    <Text variant="titleLarge" style={styles.statValue}>
+                      Export
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </Surface>
+        )}
+      </>
     );
   };
 
   const renderDownloadItem = useCallback(
     ({ item }: { item: (typeof downloads)[0] }) => {
       const isDeleting = deletingIds.has(item.id);
+      const isSelected = selectedIds.has(item.id);
 
       return (
         <View style={styles.downloadItemContainer}>
-          <View style={styles.trackItemWrapper}>
+          {selectionMode && (
+            <IconButton
+              icon={isSelected ? "checkbox-marked" : "checkbox-blank-outline"}
+              size={24}
+              onPress={() => toggleSelect(item.id)}
+              iconColor={
+                isSelected
+                  ? theme.colors.primary
+                  : theme.colors.onSurfaceVariant
+              }
+              style={styles.selectCheckbox}
+            />
+          )}
+          <View
+            style={[
+              styles.trackItemWrapper,
+              selectionMode && styles.trackItemCompact,
+            ]}
+          >
             <TrackItem
               track={item.song}
-              onPress={() => handlePlay(item.id)}
+              onPress={() =>
+                selectionMode ? toggleSelect(item.id) : handlePlay(item.id)
+              }
               showArtwork
             />
           </View>
-          <View style={styles.downloadActions}>
-            <IconButton
-              icon="delete-outline"
-              size={22}
-              onPress={() => handleDelete(item.id)}
-              iconColor={theme.colors.error}
-              disabled={isDeleting}
-              loading={isDeleting}
-              style={styles.deleteButton}
-            />
-          </View>
+          {!selectionMode && (
+            <View style={styles.downloadActions}>
+              <IconButton
+                icon="delete-outline"
+                size={22}
+                onPress={() => handleDelete(item.id)}
+                iconColor={theme.colors.error}
+                disabled={isDeleting}
+                loading={isDeleting}
+                style={styles.deleteButton}
+              />
+            </View>
+          )}
         </View>
       );
     },
-    [deletingIds, handlePlay, handleDelete, theme],
+    [
+      deletingIds,
+      selectedIds,
+      selectionMode,
+      handlePlay,
+      handleDelete,
+      toggleSelect,
+      theme,
+    ],
   );
 
   const renderEmptyState = () => (
@@ -513,6 +620,32 @@ const styles = StyleSheet.create({
   },
   trackItemWrapper: {
     flex: 1,
+  },
+  trackItemCompact: {
+    flex: 1,
+    marginLeft: -8,
+  },
+  selectCheckbox: {
+    margin: 0,
+    marginLeft: 4,
+  },
+  selectionHeader: {
+    margin: 12,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  selectionHeaderContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 4,
+  },
+  selectionTitle: {
+    flex: 1,
+    fontWeight: "600",
+  },
+  selectionActions: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   downloadActions: {
     flexDirection: "row",

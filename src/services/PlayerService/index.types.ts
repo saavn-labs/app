@@ -25,5 +25,8 @@ export interface IPlayerService {
   stop(): Promise<void>;
   addToQueue(song: Models.Song): Promise<void>;
   addNextInQueue(song: Models.Song): Promise<void>;
-  restoreLastPlayedTrack(currentSong: Models.Song | null, progress: number): Promise<void>;
+  restoreLastPlayedTrack(
+    currentSong: Models.Song | null,
+    progress: number,
+  ): Promise<void>;
 }

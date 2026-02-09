@@ -3,12 +3,19 @@ import FullPlayer from "@/components/player/FullPlayer";
 import { useUIStore } from "@/stores/uiStore";
 import { sizes } from "@/utils";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
-import React from "react";
+import { Tabs, useLocalSearchParams } from "expo-router";
+import React, { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 
 export default function TabLayout() {
   const { isFullPlayerVisible, setFullPlayerVisible } = useUIStore();
+  const { showPlayer } = useLocalSearchParams<{ showPlayer?: string }>();
+
+  useEffect(() => {
+    if (showPlayer === "true") {
+      setFullPlayerVisible(true);
+    }
+  }, [showPlayer, setFullPlayerVisible]);
 
   return (
     <View style={styles.root}>

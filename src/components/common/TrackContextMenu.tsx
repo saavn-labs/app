@@ -177,8 +177,9 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
       }
 
       await downloadTrack(track);
+
       showSnackbar({
-        message: `Downloading "${track.title}"`,
+        message: `Downloaded "${track.title}"`,
         variant: "success",
       });
       onDismiss();

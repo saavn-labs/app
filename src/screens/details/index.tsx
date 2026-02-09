@@ -3,29 +3,21 @@ import React from "react";
 
 export const AlbumScreen: React.FC<{
   albumId: string;
-  onBack: () => void;
-}> = ({ albumId, onBack }) => {
-  return <DetailScreen type="album" id={albumId} onBack={onBack} />;
+}> = ({ albumId }) => {
+  return <DetailScreen type="album" id={albumId} />;
 };
 
 export const PlaylistScreen: React.FC<{
   playlistId: string;
-  onBack: () => void;
-}> = ({ playlistId, onBack }) => {
-  return <DetailScreen type="playlist" id={playlistId} onBack={onBack} />;
+}> = ({ playlistId }) => {
+  return <DetailScreen type="playlist" id={playlistId} />;
 };
 
 export const ArtistScreen: React.FC<{
   artistId: string;
-  onBack: () => void;
   onAlbumPress?: (albumId: string) => void;
-}> = ({ artistId, onBack, onAlbumPress }) => {
+}> = ({ artistId, onAlbumPress }) => {
   return (
-    <DetailScreen
-      type="artist"
-      id={artistId}
-      onBack={onBack}
-      onAlbumPress={onAlbumPress}
-    />
+    <DetailScreen type="artist" id={artistId} onAlbumPress={onAlbumPress} />
   );
 };

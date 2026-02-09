@@ -52,20 +52,14 @@ export function formatTrackSubtitle(song: Models.Song): string {
  */
 export function formatShareMessage(song: Models.Song): {
   message: string;
-  url: string;
   title: string;
 } {
-  const url =
-    (song as Models.Song).url.replace(
-      "www.jiosaavn.com",
-      "www.sausico.pages.dev",
-    ) || `https://www.sausico.pages.dev/song/${song.id}`;
+  const url = `https://sausico.pages.dev/song/${song.id}`;
   const artistsText = formatArtistNames(song);
-  const message = `Check out "${song.title}" by ${artistsText} on JioSaavn`;
+  const message = `Check out "${song.title}" by ${artistsText} on Sausico`;
 
   return {
     message: `${message}\n${url}`,
-    url,
     title: song.title,
   };
 }

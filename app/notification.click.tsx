@@ -1,24 +1,17 @@
-import FullPlayer from "@/components/player/FullPlayer";
-import { StyleSheet, View } from "react-native";
+import { useCurrentSong } from "@/stores/playerStore";
 import { router } from "expo-router";
+import { useEffect } from "react";
 
-export default function NotificationTab() {
-  const playerVisible = true;
+export default function NotificationClick() {
+  const currentSong = useCurrentSong();
 
-  const handleClose = () => {
-    router.push("/");
-  };
+  useEffect(() => {
+    if (currentSong?.id) {
+      router.replace("/(tabs)?showPlayer=true");
+    } else {
+      router.replace("/(tabs)");
+    }
+  }, [currentSong]);
 
-  return (
-    <View style={styles.container}>
-      <FullPlayer visible={playerVisible} onClose={handleClose} />
-    </View>
-  );
+  return null;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#121212",
-  },
-});

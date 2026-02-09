@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.saavnlabs.app",
+      "sha256_cert_fingerprints": [
+        "FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C",
+        "85:41:82:08:9B:F5:20:7C:A7:6A:69:04:C3:0A:3E:34:2B:C4:34:96:49:C1:C4:EE:86:D4:02:F4:31:DB:F0:11"
+      ]
+    }
+  }
+]

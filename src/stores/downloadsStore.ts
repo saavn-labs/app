@@ -17,6 +17,7 @@ interface DownloadsState {
   deleteDownload: (songId: string) => Promise<void>;
   deleteAllDownloads: () => Promise<void>;
   cleanupOrphans: () => Promise<void>;
+  exportTracks: (songIds: string[]) => Promise<void>;
 
   isDownloaded: (songId: string) => boolean;
   getDownloadInfo: (songId: string) => DownloadedTrack | null;
@@ -115,6 +116,18 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => ({
       await get().loadDownloads();
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Cleanup failed" });
+      throw error;
+    }
+  },
+
+  exportTracks: async (songIds: string[]) => {
+    set({ error: null });
+    try {
+      await downloadService.exportTracks(songIds);
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : "Export failed",
+      });
       throw error;
     }
   },

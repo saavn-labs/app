@@ -80,7 +80,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0.0"
+        versionName "1.0.1"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -92,10 +92,10 @@ android {
             keyPassword 'android'
         }
         release {
-            storeFile file(SAAVNMUSIC_UPLOAD_STORE_FILE)
-            storePassword SAAVNMUSIC_UPLOAD_STORE_PASSWORD
-            keyAlias SAAVNMUSIC_UPLOAD_KEY_ALIAS
-            keyPassword SAAVNMUSIC_UPLOAD_KEY_PASSWORD
+            storeFile file(SAUSICO_RELEASE_STORE_FILE)
+            storePassword SAUSICO_RELEASE_STORE_PASSWORD
+            keyAlias SAUSICO_RELEASE_KEY_ALIAS
+            keyPassword SAUSICO_RELEASE_KEY_PASSWORD
         }
     }
     buildTypes {
