@@ -4,6 +4,9 @@ import { appStorage } from "@/stores/storage";
 import { PlayerStatus, RepeatMode } from "@/types";
 import { Models, Song } from "@saavn-labs/sdk";
 import TrackPlayer, {
+  AndroidAudioContentType,
+  AppKilledPlaybackBehavior,
+  Capability,
   Event,
   RepeatMode as RNTPRepeatMode,
   State,
@@ -17,6 +20,7 @@ export class PlayerService implements IPlayerService {
   private isInitialized = false;
   private lastStatus: PlayerStatus | null = null;
   private wantsToPlay = false;
+  private playerReadyPromise: Promise<void> | null = null;
 
   constructor() {
     this.initialize();
@@ -25,8 +29,52 @@ export class PlayerService implements IPlayerService {
   private async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
+    await this.ensurePlayerReady();
     this.setupEventListeners();
     this.isInitialized = true;
+  }
+
+  private async ensurePlayerReady(): Promise<void> {
+    if (this.playerReadyPromise) return this.playerReadyPromise;
+
+    this.playerReadyPromise = (async () => {
+      try {
+        await TrackPlayer.getActiveTrackIndex();
+      } catch (error: any) {
+        if (error?.code === "player_not_initialized") {
+          await TrackPlayer.setupPlayer({
+            autoHandleInterruptions: true,
+            androidAudioContentType: AndroidAudioContentType.Music,
+          });
+
+          await TrackPlayer.updateOptions({
+            progressUpdateEventInterval: 1,
+            android: {
+              appKilledPlaybackBehavior:
+                AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
+              alwaysPauseOnInterruption: true,
+              androidSkipSilence: true,
+            },
+            capabilities: [
+              Capability.Play,
+              Capability.Pause,
+              Capability.Stop,
+              Capability.SeekTo,
+              Capability.SkipToNext,
+              Capability.SkipToPrevious,
+            ],
+            notificationCapabilities: [
+              Capability.Play,
+              Capability.Pause,
+              Capability.SkipToNext,
+              Capability.SkipToPrevious,
+            ],
+          });
+        }
+      }
+    })();
+
+    return this.playerReadyPromise;
   }
 
   setStateUpdater(updater: StateUpdater): void {
@@ -90,6 +138,7 @@ export class PlayerService implements IPlayerService {
 
   async play(song: Models.Song, providedQueue?: Models.Song[]): Promise<void> {
     try {
+      await this.ensurePlayerReady();
       this.wantsToPlay = true;
 
       this.notify({
@@ -124,6 +173,7 @@ export class PlayerService implements IPlayerService {
   }
 
   async resume(): Promise<void> {
+    await this.ensurePlayerReady();
     this.wantsToPlay = true;
     await TrackPlayer.play();
   }
@@ -135,6 +185,7 @@ export class PlayerService implements IPlayerService {
     if (!currentSong) return;
 
     try {
+      await this.ensurePlayerReady();
       const fullQueue = await queueService.setQueue(currentSong);
 
       const tracks = await Promise.all(
@@ -168,6 +219,7 @@ export class PlayerService implements IPlayerService {
   }
 
   async pause(): Promise<void> {
+    await this.ensurePlayerReady();
     this.wantsToPlay = false;
     await TrackPlayer.pause();
   }
@@ -183,6 +235,7 @@ export class PlayerService implements IPlayerService {
 
   async next(): Promise<void> {
     try {
+      await this.ensurePlayerReady();
       const queue = await TrackPlayer.getQueue();
       const currentIndex = await TrackPlayer.getActiveTrackIndex();
 
@@ -215,6 +268,7 @@ export class PlayerService implements IPlayerService {
 
   async previous(): Promise<void> {
     try {
+      await this.ensurePlayerReady();
       const position = await TrackPlayer.getProgress();
 
       if (position.position > 3) {
@@ -228,16 +282,19 @@ export class PlayerService implements IPlayerService {
   }
 
   async seekTo(positionMs: number): Promise<void> {
+    await this.ensurePlayerReady();
     await TrackPlayer.seekTo(positionMs / 1000);
   }
 
   async setRepeatMode(mode: RepeatMode): Promise<void> {
+    await this.ensurePlayerReady();
     queueService.setRepeatMode(mode);
     await TrackPlayer.setRepeatMode(this.mapRepeatMode(mode));
     this.notify({ repeatMode: mode });
   }
 
   async stop(): Promise<void> {
+    await this.ensurePlayerReady();
     this.wantsToPlay = false;
     await TrackPlayer.reset();
     queueService.clear();
@@ -252,6 +309,7 @@ export class PlayerService implements IPlayerService {
 
   async addToQueue(song: Models.Song): Promise<void> {
     try {
+      await this.ensurePlayerReady();
       const track = await this.prepareTrack(song);
       if (!track) {
         throw new Error("Failed to prepare track");
@@ -266,6 +324,7 @@ export class PlayerService implements IPlayerService {
 
   async addNextInQueue(song: Models.Song): Promise<void> {
     try {
+      await this.ensurePlayerReady();
       const track = await this.prepareTrack(song);
       if (!track) {
         throw new Error("Failed to prepare track");
@@ -338,6 +397,7 @@ export class PlayerService implements IPlayerService {
 
   private async maybeExtendQueue(seedSongId: string): Promise<boolean> {
     try {
+      await this.ensurePlayerReady();
       const newTracks = await queueService.extendQueue(seedSongId);
 
       if (newTracks.length === 0) return false;

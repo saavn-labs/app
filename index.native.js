@@ -6,46 +6,55 @@ import TrackPlayer, {
     Capability,
 } from "react-native-track-player";
 
-let initialized = false;
+let playerInitialized = false;
+let playerInitPromise = null;
 
-async function initializePlayer() {
-  if (initialized) return;
+function initializePlayer() {
+  if (playerInitPromise) return playerInitPromise;
 
-  try {
-    await TrackPlayer.setupPlayer({
-      autoHandleInterruptions: true,
-      androidAudioContentType: AndroidAudioContentType.Music,
-    });
+  playerInitPromise = (async () => {
+    if (playerInitialized) return;
 
-    await TrackPlayer.updateOptions({
-      progressUpdateEventInterval: 1,
-      android: {
-        appKilledPlaybackBehavior:
-          AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
-        alwaysPauseOnInterruption: true,
-        androidSkipSilence: true,
-      },
-      capabilities: [
-        Capability.Play,
-        Capability.Pause,
-        Capability.Stop,
-        Capability.SeekTo,
-        Capability.SkipToNext,
-        Capability.SkipToPrevious,
-      ],
-      compactCapabilities: [Capability.Play, Capability.Pause],
-      notificationCapabilities: [
-        Capability.Play,
-        Capability.Pause,
-        Capability.SkipToNext,
-        Capability.SkipToPrevious,
-      ],
-    });
+    try {
+      await TrackPlayer.setupPlayer({
+        autoHandleInterruptions: true,
+        androidAudioContentType: AndroidAudioContentType.Music,
+      });
 
-    initialized = true;
-  } catch (error) {
-    console.error("Failed to initialize player:", error);
-  }
+      await TrackPlayer.updateOptions({
+        progressUpdateEventInterval: 1,
+        android: {
+          appKilledPlaybackBehavior:
+            AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
+          alwaysPauseOnInterruption: true,
+          androidSkipSilence: true,
+        },
+        capabilities: [
+          Capability.Play,
+          Capability.Pause,
+          Capability.Stop,
+          Capability.SeekTo,
+          Capability.SkipToNext,
+          Capability.SkipToPrevious,
+        ],
+        compactCapabilities: [Capability.Play, Capability.Pause],
+        notificationCapabilities: [
+          Capability.Play,
+          Capability.Pause,
+          Capability.SkipToNext,
+          Capability.SkipToPrevious,
+        ],
+      });
+
+      playerInitialized = true;
+      console.log("Player initialized successfully");
+    } catch (error) {
+      console.error("Failed to initialize player:", error);
+      throw error;
+    }
+  })();
+
+  return playerInitPromise;
 }
 
 const linking = {
@@ -73,15 +82,19 @@ const linking = {
   },
 };
 
-initializePlayer();
-
+// Register playback service immediately (before setupPlayer)
 TrackPlayer.registerPlaybackService(
   () => require("./playback-service").playbackService,
 );
 
-function App() {
-  const ctx = require.context("./app");
-  return <ExpoRoot context={ctx} linking={linking} />;
-}
+// Initialize player before mounting the app
+(async () => {
+  await initializePlayer();
 
-registerRootComponent(App);
+  function App() {
+    const ctx = require.context("./app");
+    return <ExpoRoot context={ctx} linking={linking} />;
+  }
+
+  registerRootComponent(App);
+})();

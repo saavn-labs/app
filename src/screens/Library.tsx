@@ -27,6 +27,7 @@ import {
 } from "react-native";
 import { IconButton, Menu, Text } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Platform } from "react-native";
 
 type ModalType = "create" | "rename" | null;
 
@@ -177,8 +178,8 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
     renameCollection,
   ]);
 
-  const handleDeleteCollection = useCallback(
-    (collection: Collection, closeDetail = false) => {
+  const handleDeleteCollection = (collection: Collection) => {
+    if (Platform.OS !== "web") {
       Alert.alert(
         "Delete Collection",
         `Are you sure you want to delete "${collection.name}"?`,
@@ -187,28 +188,15 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
           {
             text: "Delete",
             style: "destructive",
-            onPress: async () => {
-              const success = await deleteCollection(collection.id);
-
-              if (!success) {
-                Alert.alert("Error", "Failed to delete collection");
-                console.error(
-                  "[LibraryScreen.handleDeleteCollection]",
-                  "delete failed",
-                );
-                return;
-              }
-
-              if (closeDetail) {
-                setSelectedCollection(null);
-              }
-            },
+            onPress: async () => deleteCollection(collection.id),
           },
         ],
       );
-    },
-    [deleteCollection, setSelectedCollection],
-  );
+    } else {
+      window.confirm(`Are you sure you want to delete "${collection.name}"?`) &&
+        deleteCollection(collection.id);
+    }
+  };
 
   const openRenameModal = useCallback((collection: Collection) => {
     setEditingCollection(collection);
@@ -321,7 +309,7 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
           <FlatList
             data={favorites}
             keyExtractor={(item) => item.id}
-            renderItem={({ item, index }) => (
+            renderItem={({ item }) => (
               <TrackItem
                 track={item}
                 onPress={() => handleTrackPress(item, favorites)}
@@ -405,7 +393,7 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => handleDeleteCollection(selectedCollection, true)}
+                onPress={() => handleDeleteCollection(selectedCollection)}
                 style={[
                   styles.emptyActionButton,
                   { backgroundColor: "#ef4444" },
@@ -446,7 +434,7 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => handleDeleteCollection(selectedCollection, true)}
+                onPress={() => handleDeleteCollection(selectedCollection)}
                 style={styles.actionButton}
                 activeOpacity={0.7}
               >
