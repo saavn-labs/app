@@ -23,7 +23,14 @@ app.use("/*", async (c, next) => {
     });
   }
 
+  const path = c.req.path.toLowerCase();
+  
+  if (path.startsWith("/google")) {
+    return c.notFound();
+  }
+
   c.res.headers.set("Access-Control-Allow-Origin", "*");
+  
   await next();
 });
 
