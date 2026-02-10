@@ -1,6 +1,4 @@
-<div align="center">
-
-# <div style="display: flex; align-items: center; justify-content: center; gap: 10px"><img src="assets/images/icon.png" alt="Sausico Banner" width="40" style="border-radius: 5px;"/> Sausico </div>
+# Sausico
 
 ### A Modern, High-Performance JioSaavn Client
 
@@ -9,19 +7,39 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?style=flat&logo=android&logoColor=white)](https://www.android.com/)
 
-<img src="assets/images/banner.jpg" alt="Sausico Banner" width="800"/>
-
 **Experience music streaming reimagined with cutting-edge technology and thoughtful design.**
 
-[Features](#-features) • [Screenshots](#-screenshots) • [Quick Start](#-quick-start) • [Troubleshooting](#-troubleshooting) • [Legal Notice](#-legal-notice)
-
-</div>
+🌐 **Website:** https://sausico.pages.dev
 
 ---
 
-## 📖 Overview
+### 📌 Table of Contents
 
-**Sausico** is a full-featured music streaming application that demonstrates modern mobile development best practices. Built with **Expo**, **React Native's New Architecture**, and powered by **@saavn-labs/sdk** and **react-native-track-player**, it delivers a premium music experience with exceptional performance and a polished user interface.
+- [⬇ Download](#-download)
+- [✨ Features](#-features)
+- [🖼 Screenshots](#-screenshots)
+- [⚡ Quick Start](#-quick-start)
+- [🛠 Troubleshooting](#-troubleshooting)
+- [⚖ Legal Notice](#-legal-notice)
+
+---
+
+## ⬇ Download
+
+**Current Version:** `v1.0.1`
+
+Choose the build that matches your device architecture.
+
+| Build Variant | Device Compatibility | Download |
+|---------------|---------------------|----------|
+| **arm64-v8a** | Modern Android devices (2015+) | [![Download arm64-v8a](https://img.shields.io/badge/Download-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/saavn-labs/app/releases/download/v1.0.1/app-arm64-v8a-release.apk) |
+| **armeabi-v7a** | Older Android devices (pre-2015) | [![Download armeabi-v7a](https://img.shields.io/badge/Download-5C6BC0?style=for-the-badge&logo=android&logoColor=white)](https://github.com/saavn-labs/app/releases/download/v1.0.1/app-armeabi-v7a-release.apk) |
+| **x86_64** | Emulators and x86-based devices | [![Download x86_64](https://img.shields.io/badge/Download-0288D1?style=for-the-badge&logo=intel&logoColor=white)](https://github.com/saavn-labs/app/releases/download/v1.0.1/app-x86_64-release.apk) |
+| **x86** | Legacy emulators | [![Download x86](https://img.shields.io/badge/Download-607D8B?style=for-the-badge&logo=intel&logoColor=white)](https://github.com/saavn-labs/app/releases/download/v1.0.1/app-x86-release.apk) |
+
+> **Quick Guide:** Download arm64-v8a first. If it installs successfully, you've got the right one. If installation fails, try armeabi-v7a instead.
+
+---
 
 ### Why Sausico?
 
