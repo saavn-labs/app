@@ -26,16 +26,16 @@
 
 ## ⬇ Download
 
-**Current Version:** `v1.0.1`
+**Current Version:** `v1.0.2`
 
 Choose the build that matches your device architecture.
 
 | Build Variant | Device Compatibility | Download |
 |---------------|---------------------|----------|
-| **arm64-v8a** | Modern Android devices (2015+) | [![Download arm64-v8a](https://img.shields.io/badge/Download-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/saavn-labs/app/releases/download/v1.0.1/app-arm64-v8a-release.apk) |
-| **armeabi-v7a** | Older Android devices (pre-2015) | [![Download armeabi-v7a](https://img.shields.io/badge/Download-5C6BC0?style=for-the-badge&logo=android&logoColor=white)](https://github.com/saavn-labs/app/releases/download/v1.0.1/app-armeabi-v7a-release.apk) |
-| **x86_64** | Emulators and x86-based devices | [![Download x86_64](https://img.shields.io/badge/Download-0288D1?style=for-the-badge&logo=intel&logoColor=white)](https://github.com/saavn-labs/app/releases/download/v1.0.1/app-x86_64-release.apk) |
-| **x86** | Legacy emulators | [![Download x86](https://img.shields.io/badge/Download-607D8B?style=for-the-badge&logo=intel&logoColor=white)](https://github.com/saavn-labs/app/releases/download/v1.0.1/app-x86-release.apk) |
+| **arm64-v8a** | Modern Android devices (2015+) | [![Download arm64-v8a](https://img.shields.io/badge/Download-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/saavn-labs/app/releases/download/v1.0.2/app-arm64-v8a-release.apk) |
+| **armeabi-v7a** | Older Android devices (pre-2015) | [![Download armeabi-v7a](https://img.shields.io/badge/Download-5C6BC0?style=for-the-badge&logo=android&logoColor=white)](https://github.com/saavn-labs/app/releases/download/v1.0.2/app-armeabi-v7a-release.apk) |
+| **x86_64** | Emulators and x86-based devices | [![Download x86_64](https://img.shields.io/badge/Download-0288D1?style=for-the-badge&logo=intel&logoColor=white)](https://github.com/saavn-labs/app/releases/download/v1.0.2/app-x86_64-release.apk) |
+| **x86** | Legacy emulators | [![Download x86](https://img.shields.io/badge/Download-607D8B?style=for-the-badge&logo=intel&logoColor=white)](https://github.com/saavn-labs/app/releases/download/v1.0.2/app-x86-release.apk) |
 
 > **Quick Guide:** Download arm64-v8a first. If it installs successfully, you've got the right one. If installation fails, try armeabi-v7a instead.
 
