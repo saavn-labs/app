@@ -6,7 +6,12 @@ import {
   TrackItem,
 } from "@/components";
 import { COLORS } from "@/constants";
-import { useDetailStore, usePlayerStore } from "@/stores";
+import {
+  useDetailStore,
+  useLibraryStore,
+  usePlayerStore,
+  useSnackbarStore,
+} from "@/stores";
 import { getScreenPaddingBottom, handleAsync, theme } from "@/utils";
 import { Album, Artist, Models, Playlist } from "@saavn-labs/sdk";
 
@@ -67,6 +72,13 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const { playSong, currentSong } = usePlayerStore();
+  const savedAlbums = useLibraryStore((state) => state.savedAlbums);
+  const savedPlaylists = useLibraryStore((state) => state.savedPlaylists);
+  const toggleSavedAlbum = useLibraryStore((state) => state.toggleSavedAlbum);
+  const toggleSavedPlaylist = useLibraryStore(
+    (state) => state.toggleSavedPlaylist,
+  );
+  const showSnackbar = useSnackbarStore((state) => state.show);
 
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,7 +101,12 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
   }, [id, type]);
 
   const onBack = () => {
-    router.push("/");
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    router.replace("/");
   };
 
   const loadData = useCallback(
@@ -183,6 +200,60 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
       console.error("[DetailScreen.handleShare]", result.error);
     }
   }, [data, type]);
+
+  const isSaved = useMemo(() => {
+    if (!data?.id) return false;
+    if (type === "album") {
+      return savedAlbums.some((album) => album.id === data.id);
+    }
+    if (type === "playlist") {
+      return savedPlaylists.some((playlist) => playlist.id === data.id);
+    }
+    return false;
+  }, [data?.id, savedAlbums, savedPlaylists, type]);
+
+  const handleToggleSave = useCallback(async () => {
+    if (!data || type === "artist") return;
+
+    try {
+      if (type === "album") {
+        const success = await toggleSavedAlbum(data as unknown as Models.Album);
+        if (!success) throw new Error("Failed to update saved albums");
+        showSnackbar({
+          message: isSaved
+            ? "Removed album from library"
+            : "Saved album to library",
+          variant: "success",
+        });
+      }
+
+      if (type === "playlist") {
+        const success = await toggleSavedPlaylist(
+          data as unknown as Models.Playlist,
+        );
+        if (!success) throw new Error("Failed to update saved playlists");
+        showSnackbar({
+          message: isSaved
+            ? "Removed playlist from library"
+            : "Saved playlist to library",
+          variant: "success",
+        });
+      }
+    } catch (error) {
+      console.error("[DetailScreen.handleToggleSave]", error);
+      showSnackbar({
+        message: "Failed to update library",
+        variant: "error",
+      });
+    }
+  }, [
+    data,
+    isSaved,
+    showSnackbar,
+    toggleSavedAlbum,
+    toggleSavedPlaylist,
+    type,
+  ]);
 
   const metadata = useMemo(() => {
     if (!data) return "";
@@ -779,6 +850,21 @@ const DetailScreen: React.FC<DetailScreenProps> = ({
                 style={styles.playIconLarge}
               />
             </TouchableOpacity>
+
+            {type !== "artist" && (
+              <TouchableOpacity
+                onPress={handleToggleSave}
+                style={styles.actionButton}
+                activeOpacity={0.7}
+              >
+                <IconButton
+                  icon={isSaved ? "bookmark" : "bookmark-outline"}
+                  size={26}
+                  iconColor={isSaved ? COLORS.PRIMARY : theme.colors.onSurface}
+                  style={styles.actionIcon}
+                />
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               onPress={handleShare}

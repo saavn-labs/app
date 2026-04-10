@@ -11,16 +11,16 @@ import {
   useUpcomingTracks,
 } from "@/stores/playerStore";
 import {
-  theme,
-  formatTime,
   createColorGradient,
   extractAndUpdateColor,
+  formatTime,
+  theme,
 } from "@/utils";
 import { Models } from "@saavn-labs/sdk";
 
+import { TrackContextMenu } from "../common";
 import TrackItem from "../items/TrackItem";
 import LoadingHeartbeat from "./LoadingHeartBeat";
-import { TrackContextMenu } from "../common";
 
 import { MaterialIcons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
@@ -149,9 +149,15 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ visible, onClose }) => {
 
   const handleTrackPress = useCallback(
     async (track: Models.Song) => {
-      await playSong(track);
+      const selectedIndex = upcomingTracks.findIndex(
+        (song: Models.Song) => song.id === track.id,
+      );
+      const remainingTracks =
+        selectedIndex >= 0 ? upcomingTracks.slice(selectedIndex + 1) : [];
+
+      await playSong(track, remainingTracks);
     },
-    [playSong],
+    [playSong, upcomingTracks],
   );
 
   const renderUpNextItem = useCallback(

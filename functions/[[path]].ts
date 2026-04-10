@@ -1,6 +1,7 @@
 import { type ExecutionContext, Hono } from "hono";
 import saavnRoutes from "./_app/routes/saavn.routes";
 import seoRoutes from "./_app/routes/seo.routes";
+import updateRoutes from "./_app/routes/update.routes";
 
 type Bindings = {
   ASSETS: {
@@ -24,17 +25,18 @@ app.use("/*", async (c, next) => {
   }
 
   const path = c.req.path.toLowerCase();
-  
+
   if (path.startsWith("/google")) {
     return c.notFound();
   }
 
   c.res.headers.set("Access-Control-Allow-Origin", "*");
-  
+
   await next();
 });
 
 app.route("/saavn", saavnRoutes);
+app.route("/update", updateRoutes);
 app.route("/", seoRoutes);
 
 export const onRequest = async ({

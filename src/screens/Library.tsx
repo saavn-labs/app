@@ -1,35 +1,40 @@
-import { COLORS } from "@/constants";
-import { TrackItem } from "@/components";
+import { GenericMediaItem, TrackItem } from "@/components";
 import type { Collection } from "@/services";
 import { useLibraryStore, usePlayerStore } from "@/stores";
-import { theme, getScreenPaddingBottom } from "@/utils";
+import { getScreenPaddingBottom, theme } from "@/utils";
 import { Models } from "@saavn-labs/sdk";
 
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  Alert,
-  Animated,
-  FlatList,
-  Modal,
-  RefreshControl,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Animated,
+    FlatList,
+    Modal,
+    Platform,
+    RefreshControl,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { IconButton, Menu, Text } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Platform } from "react-native";
 
 type ModalType = "create" | "rename" | null;
+
+const SYSTEM_COLLECTION_IDS = ["system-liked-songs", "system-local-files"];
+
+const isSystemCollection = (collectionId: string): boolean =>
+  SYSTEM_COLLECTION_IDS.includes(collectionId);
 
 interface LibraryScreenProps {
   onCollectionPress?: (collectionId: string) => void;
@@ -52,7 +57,8 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
   const { playSong, currentSong } = usePlayerStore();
 
   const {
-    favorites,
+    savedAlbums,
+    savedPlaylists,
     collections,
     selectedCollection,
     activeTab,
@@ -62,6 +68,8 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
     createCollection,
     renameCollection,
     deleteCollection,
+    toggleSavedAlbum,
+    toggleSavedPlaylist,
   } = useLibraryStore();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -108,6 +116,32 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
       }
     },
     [playSong],
+  );
+
+  const handleOpenAlbum = useCallback((albumId: string) => {
+    router.push(`/album/${albumId}`);
+  }, []);
+
+  const handleOpenPlaylist = useCallback((playlistId: string) => {
+    router.push(`/playlist/${playlistId}`);
+  }, []);
+
+  const handleRemoveSavedAlbum = useCallback(
+    async (albumId: string) => {
+      const album = savedAlbums.find((item) => item.id === albumId);
+      if (!album) return;
+      await toggleSavedAlbum(album as unknown as Models.Album);
+    },
+    [savedAlbums, toggleSavedAlbum],
+  );
+
+  const handleRemoveSavedPlaylist = useCallback(
+    async (playlistId: string) => {
+      const playlist = savedPlaylists.find((item) => item.id === playlistId);
+      if (!playlist) return;
+      await toggleSavedPlaylist(playlist as unknown as Models.Playlist);
+    },
+    [savedPlaylists, toggleSavedPlaylist],
   );
 
   const handleCreateCollection = useCallback(async () => {
@@ -267,72 +301,18 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
     [theme.colors.onSurfaceVariant, theme.colors.primary],
   );
 
-  const renderFavoriteSongs = useMemo(() => {
-    if (favorites.length === 0) {
-      return renderEmptyState(
-        "favorite-border",
-        "No liked songs yet",
-        "Songs you like will appear here",
-      );
-    }
-
-    return (
-      <View style={styles.contentContainer}>
-        <LinearGradient
-          colors={[COLORS.PRIMARY, "#1aa34a", theme.colors.background]}
-          style={styles.favoritesHeader}
-        >
-          <View style={styles.favoritesHeroContent}>
-            <View style={styles.favoritesIconContainer}>
-              <MaterialIcons name="favorite" size={64} color="#ffffff" />
-            </View>
-            <Text variant="displaySmall" style={styles.favoritesTitle}>
-              Liked Songs
-            </Text>
-            <Text variant="bodyLarge" style={styles.favoritesMeta}>
-              {favorites.length} song{favorites.length !== 1 ? "s" : ""}
-            </Text>
-          </View>
-        </LinearGradient>
-
-        <View style={styles.actionContainer}>
-          <TouchableOpacity
-            onPress={() => handlePlayAll(favorites)}
-            style={[styles.playButtonLarge, { backgroundColor: "#1db954" }]}
-            activeOpacity={0.8}
-          >
-            <MaterialIcons name="play-arrow" size={32} color="#000000" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.songsListContainer}>
-          <FlatList
-            data={favorites}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TrackItem
-                track={item}
-                onPress={() => handleTrackPress(item, favorites)}
-                isActive={currentSong?.id === item.id}
-                showArtwork
-              />
-            )}
-            scrollEnabled={false}
-          />
-        </View>
-      </View>
-    );
-  }, [
-    favorites,
-    theme.colors,
-    currentSong,
-    handlePlayAll,
-    handleTrackPress,
-    renderEmptyState,
-  ]);
-
   const renderCollectionDetail = useMemo(() => {
     if (!selectedCollection) return null;
+
+    const selectedIsSystemCollection = isSystemCollection(
+      selectedCollection.id,
+    );
+    const detailIconName =
+      selectedCollection.id === "system-liked-songs"
+        ? "favorite"
+        : selectedCollection.id === "system-local-files"
+          ? "folder"
+          : "library-music";
 
     const gradientColors = getGradientForCollection(
       collections.findIndex((c) => c.id === selectedCollection.id),
@@ -358,7 +338,11 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
 
           <View style={styles.collectionDetailContent}>
             <View style={styles.collectionDetailIconContainer}>
-              <MaterialIcons name="library-music" size={64} color="#ffffff" />
+              <MaterialIcons
+                name={detailIconName as any}
+                size={64}
+                color="#ffffff"
+              />
             </View>
             <Text variant="displaySmall" style={styles.collectionDetailTitle}>
               {selectedCollection.name}
@@ -373,39 +357,41 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
         {selectedCollection.songs.length === 0 ? (
           <>
             {renderEmptyState(
-              "library-music",
+              detailIconName,
               "Empty collection",
               "Songs you add to this collection will appear here",
             )}
-            <View style={styles.emptyActionsContainer}>
-              <TouchableOpacity
-                onPress={() => openRenameModal(selectedCollection)}
-                style={[
-                  styles.emptyActionButton,
-                  { backgroundColor: theme.colors.primary },
-                ]}
-                activeOpacity={0.8}
-              >
-                <MaterialIcons name="edit" size={20} color="#000000" />
-                <Text variant="labelLarge" style={styles.emptyActionText}>
-                  Rename
-                </Text>
-              </TouchableOpacity>
+            {!selectedIsSystemCollection && (
+              <View style={styles.emptyActionsContainer}>
+                <TouchableOpacity
+                  onPress={() => openRenameModal(selectedCollection)}
+                  style={[
+                    styles.emptyActionButton,
+                    { backgroundColor: theme.colors.primary },
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons name="edit" size={20} color="#000000" />
+                  <Text variant="labelLarge" style={styles.emptyActionText}>
+                    Rename
+                  </Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => handleDeleteCollection(selectedCollection)}
-                style={[
-                  styles.emptyActionButton,
-                  { backgroundColor: "#ef4444" },
-                ]}
-                activeOpacity={0.8}
-              >
-                <MaterialIcons name="delete" size={20} color="#ffffff" />
-                <Text variant="labelLarge" style={styles.emptyDeleteText}>
-                  Delete
-                </Text>
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  onPress={() => handleDeleteCollection(selectedCollection)}
+                  style={[
+                    styles.emptyActionButton,
+                    { backgroundColor: "#ef4444" },
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons name="delete" size={20} color="#ffffff" />
+                  <Text variant="labelLarge" style={styles.emptyDeleteText}>
+                    Delete
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </>
         ) : (
           <>
@@ -421,29 +407,33 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
                 <MaterialIcons name="play-arrow" size={32} color="#000000" />
               </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => openRenameModal(selectedCollection)}
-                style={styles.actionButton}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons
-                  name="edit"
-                  size={24}
-                  color={theme.colors.onSurface}
-                />
-              </TouchableOpacity>
+              {!selectedIsSystemCollection && (
+                <>
+                  <TouchableOpacity
+                    onPress={() => openRenameModal(selectedCollection)}
+                    style={styles.actionButton}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialIcons
+                      name="edit"
+                      size={24}
+                      color={theme.colors.onSurface}
+                    />
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => handleDeleteCollection(selectedCollection)}
-                style={styles.actionButton}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons
-                  name="delete-outline"
-                  size={24}
-                  color="#ef4444"
-                />
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDeleteCollection(selectedCollection)}
+                    style={styles.actionButton}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialIcons
+                      name="delete-outline"
+                      size={24}
+                      color="#ef4444"
+                    />
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
 
             <View style={styles.songsListContainer}>
@@ -483,6 +473,13 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
   const renderCollectionCard = useCallback(
     ({ item, index }: { item: Collection; index: number }) => {
       const gradientColors = getGradientForCollection(index);
+      const systemCollection = isSystemCollection(item.id);
+      const collectionIcon =
+        item.id === "system-liked-songs"
+          ? "favorite"
+          : item.id === "system-local-files"
+            ? "folder"
+            : "library-music";
 
       return (
         <TouchableOpacity
@@ -496,7 +493,11 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <MaterialIcons name="library-music" size={40} color="#ffffff" />
+            <MaterialIcons
+              name={collectionIcon as any}
+              size={40}
+              color="#ffffff"
+            />
           </LinearGradient>
           <View style={styles.collectionCardInfo}>
             <Text numberOfLines={1} style={styles.collectionCardName}>
@@ -506,35 +507,36 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
               {item.songs.length} song{item.songs.length !== 1 ? "s" : ""}
             </Text>
           </View>
-
-          <Menu
-            visible={menuVisible === item.id}
-            onDismiss={() => setMenuVisible(null)}
-            anchor={
-              <IconButton
-                icon="dots-vertical"
-                size={24}
-                iconColor={theme.colors.onSurfaceVariant}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  setMenuVisible(item.id);
-                }}
-                style={styles.menuButton}
+          {!systemCollection && (
+            <Menu
+              visible={menuVisible === item.id}
+              onDismiss={() => setMenuVisible(null)}
+              anchor={
+                <IconButton
+                  icon="dots-vertical"
+                  size={24}
+                  iconColor={theme.colors.onSurfaceVariant}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setMenuVisible(item.id);
+                  }}
+                  style={styles.menuButton}
+                />
+              }
+            >
+              <Menu.Item
+                onPress={() => openRenameModal(item)}
+                title="Rename"
+                leadingIcon="pencil"
               />
-            }
-          >
-            <Menu.Item
-              onPress={() => openRenameModal(item)}
-              title="Rename"
-              leadingIcon="pencil"
-            />
-            <Menu.Item
-              onPress={() => handleDeleteCollection(item)}
-              title="Delete"
-              leadingIcon="delete"
-              titleStyle={{ color: "#ef4444" }}
-            />
-          </Menu>
+              <Menu.Item
+                onPress={() => handleDeleteCollection(item)}
+                title="Delete"
+                leadingIcon="delete"
+                titleStyle={{ color: "#ef4444" }}
+              />
+            </Menu>
+          )}
         </TouchableOpacity>
       );
     },
@@ -571,6 +573,81 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
     );
   }, [collections, renderEmptyState, renderCollectionCard, openCreateModal]);
 
+  const renderSavedMedia = useMemo(() => {
+    if (savedAlbums.length === 0 && savedPlaylists.length === 0) {
+      return renderEmptyState(
+        "bookmark-border",
+        "No saved albums or playlists",
+        "Save albums and playlists to access them quickly",
+      );
+    }
+
+    return (
+      <View style={styles.savedMediaContainer}>
+        {savedAlbums.length > 0 && (
+          <View style={styles.savedSection}>
+            <Text variant="titleLarge" style={styles.savedSectionTitle}>
+              Albums
+            </Text>
+            {savedAlbums.map((album) => (
+              <View key={album.id} style={styles.savedRow}>
+                <View style={styles.savedMediaItemWrap}>
+                  <GenericMediaItem
+                    data={album}
+                    type="album"
+                    onPress={() => handleOpenAlbum(album.id)}
+                  />
+                </View>
+                <IconButton
+                  icon="bookmark-remove-outline"
+                  size={22}
+                  iconColor={theme.colors.onSurfaceVariant}
+                  onPress={() => handleRemoveSavedAlbum(album.id)}
+                  style={styles.savedRemoveButton}
+                />
+              </View>
+            ))}
+          </View>
+        )}
+
+        {savedPlaylists.length > 0 && (
+          <View style={styles.savedSection}>
+            <Text variant="titleLarge" style={styles.savedSectionTitle}>
+              Playlists
+            </Text>
+            {savedPlaylists.map((playlist) => (
+              <View key={playlist.id} style={styles.savedRow}>
+                <View style={styles.savedMediaItemWrap}>
+                  <GenericMediaItem
+                    data={playlist}
+                    type="playlist"
+                    onPress={() => handleOpenPlaylist(playlist.id)}
+                  />
+                </View>
+                <IconButton
+                  icon="bookmark-remove-outline"
+                  size={22}
+                  iconColor={theme.colors.onSurfaceVariant}
+                  onPress={() => handleRemoveSavedPlaylist(playlist.id)}
+                  style={styles.savedRemoveButton}
+                />
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  }, [
+    handleOpenAlbum,
+    handleOpenPlaylist,
+    handleRemoveSavedAlbum,
+    handleRemoveSavedPlaylist,
+    renderEmptyState,
+    savedAlbums,
+    savedPlaylists,
+    theme.colors.onSurfaceVariant,
+  ]);
+
   const handleModalSubmit = useCallback(() => {
     if (modalType === "create") {
       handleCreateCollection();
@@ -585,38 +662,6 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
     >
       <View style={styles.header}>
         <View style={styles.tabs}>
-          <TouchableOpacity
-            onPress={() => {
-              setActiveTab("songs");
-              setSelectedCollection(null);
-            }}
-            style={[
-              styles.tab,
-              activeTab === "songs" && {
-                backgroundColor: theme.colors.primary,
-              },
-            ]}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons
-              name="favorite"
-              size={18}
-              color={activeTab === "songs" ? "#000000" : theme.colors.onSurface}
-            />
-            <Text
-              variant="labelLarge"
-              style={[
-                styles.tabLabel,
-                {
-                  color:
-                    activeTab === "songs" ? "#000000" : theme.colors.onSurface,
-                },
-              ]}
-            >
-              Liked Songs
-            </Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             onPress={() => setActiveTab("collections")}
             style={[
@@ -649,6 +694,38 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
               Collections
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedCollection(null);
+              setActiveTab("media");
+            }}
+            style={[
+              styles.tab,
+              activeTab === "media" && {
+                backgroundColor: theme.colors.primary,
+              },
+            ]}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons
+              name="bookmark"
+              size={18}
+              color={activeTab === "media" ? "#000000" : theme.colors.onSurface}
+            />
+            <Text
+              variant="labelLarge"
+              style={[
+                styles.tabLabel,
+                {
+                  color:
+                    activeTab === "media" ? "#000000" : theme.colors.onSurface,
+                },
+              ]}
+            >
+              Saved Media
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -675,9 +752,9 @@ const LibraryScreen: React.FC<LibraryScreenProps> = () => {
       >
         {selectedCollection
           ? renderCollectionDetail
-          : activeTab === "songs"
-            ? renderFavoriteSongs
-            : renderCollectionsList}
+          : activeTab === "collections"
+            ? renderCollectionsList
+            : renderSavedMedia}
       </Animated.ScrollView>
 
       {activeTab === "collections" && !selectedCollection && (
@@ -806,39 +883,6 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
   },
-  favoritesHeader: {
-    paddingTop: 40,
-    paddingBottom: 32,
-    paddingHorizontal: 20,
-    alignItems: "center",
-  },
-  favoritesHeroContent: {
-    alignItems: "center",
-  },
-  favoritesIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  favoritesTitle: {
-    fontWeight: "900",
-    color: "#ffffff",
-    marginBottom: 8,
-    fontSize: 36,
-  },
-  favoritesMeta: {
-    color: "#ffffffdd",
-    fontWeight: "500",
-  },
   collectionDetailHeader: {
     paddingTop: 60,
     paddingBottom: 32,
@@ -908,6 +952,33 @@ const styles = StyleSheet.create({
   },
   collectionsListContainer: {
     paddingTop: 16,
+  },
+  savedMediaContainer: {
+    paddingTop: 16,
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  savedSection: {
+    gap: 8,
+  },
+  savedSectionTitle: {
+    fontWeight: "700",
+  },
+  savedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    paddingLeft: 6,
+    paddingRight: 4,
+  },
+  savedMediaItemWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  savedRemoveButton: {
+    margin: 0,
+    marginLeft: 4,
   },
   collectionsList: {
     paddingHorizontal: 20,

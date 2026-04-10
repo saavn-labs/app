@@ -1,7 +1,10 @@
+import AppUpdateDialog from "@/components/common/AppUpdateDialog";
 import GlobalSnackbar from "@/components/common/GlobalSnackbar";
 import { playerService } from "@/services/PlayerService/index.web";
+import { updateService } from "@/services/UpdateService";
 import { usePlayerStore } from "@/stores/playerStore";
 import { iconFonts } from "@/utils/loadFonts";
+import { setFetchConfig } from "@saavn-labs/sdk";
 import { useFonts } from "expo-font";
 import { Link, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -20,6 +23,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 void SplashScreen.preventAutoHideAsync();
+
+setFetchConfig({
+  baseUrl: "https://sausico.pages.dev/saavn",
+});
 
 const fonts = configureFonts({
   config: {
@@ -76,6 +83,10 @@ export default function Layout() {
 
   useEffect(() => {
     playerService.initialize();
+  }, []);
+
+  useEffect(() => {
+    void updateService.checkOnLaunch();
   }, []);
 
   useEffect(() => {
@@ -151,6 +162,7 @@ export default function Layout() {
             }}
           />
         </Stack>
+        <AppUpdateDialog />
         <GlobalSnackbar />
       </SafeAreaView>
     </PaperProvider>

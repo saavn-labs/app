@@ -1,8 +1,9 @@
 import {
-  type DownloadedTrack,
-  type DownloadProgress,
-  downloadService,
+    type DownloadedTrack,
+    type DownloadProgress,
+    downloadService,
 } from "@/services/DownloadService";
+import { useLibraryStore } from "@/stores/libraryStore";
 import { Models } from "@saavn-labs/sdk";
 import { create } from "zustand";
 
@@ -67,6 +68,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => ({
       });
 
       await get().loadDownloads();
+      await useLibraryStore.getState().refreshCollections();
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : "Download failed",
@@ -88,6 +90,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => ({
       set((state) => ({
         downloads: state.downloads.filter((d) => d.id !== songId),
       }));
+      await useLibraryStore.getState().refreshCollections();
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : "Failed to delete",
@@ -101,6 +104,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => ({
     try {
       await downloadService.deleteAllDownloads();
       set({ downloads: [], activeDownloads: new Map() });
+      await useLibraryStore.getState().refreshCollections();
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : "Failed to delete all",
@@ -114,6 +118,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => ({
     try {
       await downloadService.cleanupOrphans();
       await get().loadDownloads();
+      await useLibraryStore.getState().refreshCollections();
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Cleanup failed" });
       throw error;

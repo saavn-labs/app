@@ -1,5 +1,5 @@
 import { RepeatMode } from "@/types";
-import { Models, Song } from "@saavn-labs/sdk";
+import { Extras, Models, Song } from "@saavn-labs/sdk";
 import { historyService } from "./HistoryService";
 
 export interface QueueState {
@@ -47,7 +47,10 @@ export class QueueService {
     let fullQueue: Models.Song[] = [];
 
     if (providedQueue?.length) {
-      fullQueue = [currentSong, ...providedQueue];
+      fullQueue = [
+        currentSong,
+        ...this.normalizeProvidedQueue(currentSong, providedQueue),
+      ];
     } else {
       const recs = await this.fetchRecommendations(currentSong.id);
       fullQueue = [currentSong, ...recs.slice(0, 10)];
@@ -65,6 +68,32 @@ export class QueueService {
     await this.trackPlay(currentSong);
 
     return fullQueue;
+  }
+
+  private normalizeProvidedQueue(
+    currentSong: Models.Song,
+    providedQueue: Models.Song[],
+  ): Models.Song[] {
+    const currentIndex = providedQueue.findIndex(
+      (song) => song.id === currentSong.id,
+    );
+    const queueFromCurrent =
+      currentIndex >= 0 ? providedQueue.slice(currentIndex + 1) : providedQueue;
+
+    const seen = new Set<string>();
+
+    return queueFromCurrent.filter((song) => {
+      if (!song.id || song.id === currentSong.id) {
+        return false;
+      }
+
+      if (seen.has(song.id)) {
+        return false;
+      }
+
+      seen.add(song.id);
+      return true;
+    });
   }
 
   async extendQueue(seedSongId: string): Promise<Models.Song[]> {
@@ -137,7 +166,11 @@ export class QueueService {
     seedSongId: string,
   ): Promise<Models.Song[]> {
     try {
-      const songs = await Song.getRecommendations({ songId: seedSongId });
+      const { stationId } = await Extras.createEntityStation({
+        songIds: [seedSongId],
+      });
+      const { songs } = await Song.getByStationId({ stationId });
+      
       const history = await historyService.getHistory();
       const playedIds = new Set(history.map((entry) => entry.song.id));
       const queueIds = new Set([...this.trackIdMap.keys()]);

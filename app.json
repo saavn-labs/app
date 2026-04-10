@@ -2,32 +2,26 @@
   "expo": {
     "name": "Sausico",
     "slug": "sausico",
-    "version": "1.0.1",
+    "version": "1.0.2git tag v1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "sausico",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "intentFilters": [
-      {
-        "action": "VIEW",
-        "autoVerify": true,
-        "data": [
-          {
-            "scheme": "https",
-            "host": "sausico.pages.dev",
-            "pathPrefix": "/"
-          },
-          {
-            "scheme": "https",
-            "host": "*.sausico.pages.dev",
-            "pathPrefix": "/"
-          }
-        ],
-        "category": ["BROWSABLE", "DEFAULT"]
-      }
-    ],
     "android": {
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "sausico.pages.dev"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

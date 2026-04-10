@@ -1,32 +1,32 @@
 import {
-  usePlayerStore,
-  useLibraryStore,
-  useSnackbarStore,
-  useDownloadsStore,
+    useDownloadsStore,
+    useLibraryStore,
+    usePlayerStore,
+    useSnackbarStore,
 } from "@/stores";
-import { formatShareMessage } from "@/utils/formatters";
 import { theme } from "@/utils";
+import { formatShareMessage } from "@/utils/formatters";
 import { Models } from "@saavn-labs/sdk";
 
+import { router } from "expo-router";
 import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Modal,
-  Share,
-  StyleSheet,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    Modal,
+    Share,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Divider,
-  List,
-  Portal,
-  Surface,
-  Text,
+    ActivityIndicator,
+    Divider,
+    List,
+    Portal,
+    Surface,
+    Text,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
 
 interface TrackContextMenuProps {
   visible: boolean;
@@ -41,6 +41,8 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
   onDismiss,
   onComplete,
 }) => {
+  const NON_ADDABLE_COLLECTION_IDS = ["system-local-files"];
+
   const insets = useSafeAreaInsets();
 
   const { addToQueue, addNextInQueue } = usePlayerStore();
@@ -312,15 +314,19 @@ const TrackContextMenu: React.FC<TrackContextMenuProps> = ({
           </Text>
         </View>
       ) : (
-        collections.map((collection) => (
-          <List.Item
-            key={collection.id}
-            title={collection.name}
-            left={(props) => <List.Icon {...props} icon="playlist-music" />}
-            onPress={() => handleAddToCollection(collection.id)}
-            style={styles.listItem}
-          />
-        ))
+        collections
+          .filter(
+            (collection) => !NON_ADDABLE_COLLECTION_IDS.includes(collection.id),
+          )
+          .map((collection) => (
+            <List.Item
+              key={collection.id}
+              title={collection.name}
+              left={(props) => <List.Icon {...props} icon="playlist-music" />}
+              onPress={() => handleAddToCollection(collection.id)}
+              style={styles.listItem}
+            />
+          ))
       )}
     </>
   );

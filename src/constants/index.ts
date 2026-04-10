@@ -1,5 +1,7 @@
 export const STORAGE_KEYS = {
   FAVORITES: "@favorites",
+  SAVED_ALBUMS: "@saved_albums",
+  SAVED_PLAYLISTS: "@saved_playlists",
   COLLECTIONS: "@collections",
   HISTORY: "@playback_history",
   RECENT_SEARCHES: "@recent_searches",
@@ -7,6 +9,8 @@ export const STORAGE_KEYS = {
   PLAYER_STATE: "@player_state",
   CONTENT_QUALITY: "CONTENT_QUALITY",
   DOWNLOADS: "@downloads",
+  UPDATE_CHECK_CACHE: "@update_check_cache",
+  UPDATE_APK_URI: "@update_apk_uri",
 } as const;
 
 export const PLAYER_CONFIG = {
