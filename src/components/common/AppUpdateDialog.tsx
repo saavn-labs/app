@@ -72,7 +72,7 @@ const AppUpdateDialog: React.FC = () => {
             mode="contained"
             disabled={isBusy}
             onPress={() => {
-              void updateService.startDownloadAndInstall();
+              void updateService.startDownloadAndInstall(releaseUrl!);
             }}
           >
             {downloadState === "download-failed" ? "Retry" : "Update"}

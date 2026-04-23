@@ -3,154 +3,94 @@ import { useSnackbarStore } from "@/stores/snackbarStore";
 import { appStorage } from "@/stores/storage";
 import { useUpdateStore } from "@/stores/updateStore";
 import * as Application from "expo-application";
-import { File, Paths } from "expo-file-system";
 import * as IntentLauncher from "expo-intent-launcher";
 import { NativeModules, Platform } from "react-native";
-
-type CheckResponse = {
-  updateAvailable: boolean;
-  apkUrl?: string;
-  latestVersion?: string;
-  version?: string;
-  releaseUrl?: string;
-  name?: string;
-  apk?: {
-    url?: string;
-  };
-  forceUpdate?: boolean;
-};
-
-type UpdateCheckCache = {
-  checkedAt: number;
-  response: CheckResponse;
-};
-
-const UPDATE_CHECK_ENDPOINT = "https://sausico.pages.dev/update/check";
-const CACHE_WINDOW_MS = 24 * 60 * 60 * 1000;
-const APK_FILE_NAME = "sausico-update.apk";
-
-let hasCheckedThisSession = false;
+import RNFetchBlob from "react-native-blob-util";
 
 class UpdateService {
-  async checkOnLaunch(): Promise<void> {
+  async startDownloadAndInstall(apkUrl: string): Promise<void> {
     if (Platform.OS !== "android") return;
-    if (hasCheckedThisSession) return;
-
-    hasCheckedThisSession = true;
-
-    try {
-      const cachedRaw = await appStorage.getItem(
-        STORAGE_KEYS.UPDATE_CHECK_CACHE,
-      );
-      if (cachedRaw) {
-        const cached = JSON.parse(cachedRaw) as UpdateCheckCache;
-        if (Date.now() - cached.checkedAt < CACHE_WINDOW_MS) {
-          this.handleCheckResponse(cached.response);
-          return;
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    try {
-      const payload = {
-        version: this.getCurrentVersion(),
-        arch: this.getDeviceArchitecture(),
-      };
-
-      const res = await fetch(UPDATE_CHECK_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      console.log("Update check response:", res);
-
-      if (!res.ok) return;
-
-      const data = (await res.json()) as CheckResponse;
-
-      await appStorage.setItem(
-        STORAGE_KEYS.UPDATE_CHECK_CACHE,
-        JSON.stringify({
-          checkedAt: Date.now(),
-          response: data,
-        } satisfies UpdateCheckCache),
-      );
-
-      this.handleCheckResponse(data);
-    } catch {
-      // fail silently
-    }
-  }
-
-  async startDownloadAndInstall(): Promise<void> {
-    const { apkUrl } = useUpdateStore.getState();
-    if (!apkUrl) return;
 
     const updateStore = useUpdateStore.getState();
+
     updateStore.setError(null);
     updateStore.setProgress(0);
     updateStore.setDownloadState("downloading");
 
     try {
-      const destination = new File(Paths.document, APK_FILE_NAME);
+      const { config, fs } = RNFetchBlob;
 
-      const apkFile = await File.downloadFileAsync(apkUrl, destination, {
-        idempotent: true,
-        headers: {
-          "User-Agent": `Sausico/${this.getCurrentVersion()}`,
+      const path = `${fs.dirs.DownloadDir}/app-update.apk`;
+
+      // 🚀 Use DownloadManager (system handles progress + notification)
+      const res = await config({
+        fileCache: true,
+        path,
+        addAndroidDownloads: {
+          useDownloadManager: true,
+          notification: true,
+          title: "Downloading update",
+          description: "App update in progress...",
+          mime: "application/vnd.android.package-archive",
+          mediaScannable: true,
+          path,
         },
-      });
+      }).fetch("GET", apkUrl);
 
-      useUpdateStore.getState().setProgress(1);
+      const apkPath = res.path();
 
-      await appStorage.setItem(STORAGE_KEYS.UPDATE_APK_URI, apkFile.uri);
+      // Since DownloadManager handles UI, just mark as installing
+      updateStore.setProgress(1);
+      updateStore.setDownloadState("installing");
 
-      useUpdateStore.getState().setDownloadState("installing");
-      let installLaunched = false;
-      await this.installDownloadedApk(apkFile.uri);
-      installLaunched = true;
+      await appStorage.setItem(STORAGE_KEYS.UPDATE_APK_URI, apkPath);
 
-      if (installLaunched) {
-        useUpdateStore.getState().completeFlow();
-      }
-    } catch {
-      useUpdateStore.getState().setDownloadState("download-failed");
-      useUpdateStore.getState().setError("Could not download update.");
+      await this.installApk(apkPath);
+
+      updateStore.completeFlow();
+    } catch (err) {
+      console.error("Update failed:", err);
+
+      updateStore.setDownloadState("download-failed");
+      updateStore.setError("Update failed");
 
       useSnackbarStore.getState().show({
-        message: "Update download failed. Tap retry.",
+        message: "Update failed. Tap retry.",
         variant: "warning",
         actionLabel: "Retry",
         onAction: () => {
-          void this.startDownloadAndInstall();
+          this.startDownloadAndInstall(apkUrl);
         },
       });
     }
   }
 
-  private handleCheckResponse(response: CheckResponse): void {
-    if (!response.updateAvailable) return;
+  private async installApk(apkPath: string): Promise<void> {
+    try {
+      // ⚠️ Using raw flags (works reliably across setups)
+      const FLAG_GRANT_READ_URI_PERMISSION = 0x00000001;
+      const FLAG_ACTIVITY_NEW_TASK = 0x10000000;
 
-    const apkUrl = response.apkUrl ?? response.apk?.url;
-    const latestVersion = response.latestVersion ?? response.version;
+      await IntentLauncher.startActivityAsync(
+        "android.intent.action.VIEW",
+        {
+          data: `file://${apkPath}`,
+          type: "application/vnd.android.package-archive",
+          flags:
+            FLAG_GRANT_READ_URI_PERMISSION | FLAG_ACTIVITY_NEW_TASK,
+        }
+      );
+    } catch (err) {
+      console.error("Install failed:", err);
 
-    if (!apkUrl) return;
-
-    useUpdateStore.getState().showUpdate({
-      latestVersion,
-      apkUrl,
-      releaseName: response.name,
-      releaseUrl: response.releaseUrl,
-      forceUpdate: Boolean(response.forceUpdate),
-    });
+      useSnackbarStore.getState().show({
+        message: "Please enable 'Install unknown apps' permission",
+        variant: "warning",
+      });
+    }
   }
 
-  private getCurrentVersion(): string {
+  getCurrentVersion(): string {
     return (
       Application.nativeApplicationVersion ??
       Application.nativeBuildVersion ??
@@ -158,12 +98,13 @@ class UpdateService {
     );
   }
 
-  private getDeviceArchitecture(): string {
+  getDeviceArchitecture(): string {
     if (Platform.OS !== "android") return "arm64-v8a";
 
     const platformConstants = Platform.constants as
       | { SupportedAbis?: string[] }
       | undefined;
+
     const nativeSupportedAbis = (
       NativeModules.PlatformConstants as
         | { SupportedAbis?: string[] }
@@ -174,18 +115,6 @@ class UpdateService {
       platformConstants?.SupportedAbis ?? nativeSupportedAbis ?? [];
 
     return supportedAbis[0] ?? "arm64-v8a";
-  }
-
-  private async installDownloadedApk(apkUri: string): Promise<void> {
-    const file = new File(apkUri);
-
-    const contentUri = await file.contentUri;
-
-    await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
-      data: contentUri,
-      type: "application/vnd.android.package-archive",
-      flags: 1,
-    });
   }
 }
 
