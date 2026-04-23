@@ -1,6 +1,6 @@
 import AppUpdateDialog from "@/components/common/AppUpdateDialog";
 import GlobalSnackbar from "@/components/common/GlobalSnackbar";
-import { playerService } from "@/services/PlayerService/index.web";
+import { playerService } from "@/services/PlayerService";
 import { updateService } from "@/services/UpdateService";
 import { usePlayerStore } from "@/stores/playerStore";
 import { iconFonts } from "@/utils/loadFonts";

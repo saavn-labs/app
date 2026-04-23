@@ -1,7 +1,7 @@
 {
   "name": "sausico",
   "main": "expo-router/entry",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -36,12 +36,12 @@
     "react-native-gesture-handler": "~2.28.0",
     "react-native-image-colors": "^2.6.0",
     "react-native-mmkv": "^4.3.1",
-    "react-native-nitro-modules": "^0.35.4",
+    "react-native-nitro-modules": "^0.35.5",
+    "react-native-nitro-player": "^1.0.1",
     "react-native-paper": "^5.15.0",
     "react-native-reanimated": "~4.1.7",
     "react-native-safe-area-context": "~5.6.2",
     "react-native-screens": "~4.16.0",
-    "react-native-track-player": "^5.0.0-alpha0-nightly-359af5a12d712d3b685530aed9b9625865a25d74",
     "react-native-web": "^0.21.2",
     "zustand": "^4.5.7"
   },
